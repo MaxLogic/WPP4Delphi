@@ -1,0 +1,43 @@
+application:
+  id: wppconnect-team.wpp4delphi
+  name: WPP4Delphi  
+  description: WPP4Delphi is an open-source project with the aim of exporting functions from WhatsApp Web for Delphi/Lazarus, which can be used to support the creation of any interaction.
+  url: https://github.com/wppconnect-team/WPP4Delphi
+  version file: version.txt
+
+supported frameworks:
+  vcl:
+    ide since: delphixe2
+    ide until: delphi12
+    platforms:
+      - win32intel
+      - win64intel
+  cef:
+    ide since: delphixe2
+    ide until: delphi12
+    platforms:
+      - win32intel
+      - win64intel
+
+packages:
+  - TWPP4DelphiCollection: [design, vcl, cef]
+
+package options:
+  root package folder: .
+  ignore dproj platforms: false
+  package folders:
+    delphixe2+: Packages
+
+paths:
+  extra library paths:
+    - Source
+  extra browsing paths:
+    - Source
+
+defines:
+  defines filename: Source/WPP4Delphi.inc
+  available defines:
+    - CEFCurrentVersion
+
+dependencies:
+  - salvadordf.cef4delphi: CEF4Delphi
