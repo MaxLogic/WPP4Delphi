@@ -5746,6 +5746,8 @@ function MensagemDlgBR(txtMsg:String):boolean; //alteração em 17/07/2022📍
 {http://www.planetadelphi.com.br/dica/4365/funcao-para-traduzir-mbyes,-mbno-do-messagedlg}
 var Mensagem:TForm;
 begin
+  Result:= False;// prevent compiler warning
+
   {Cria a janela de mensagem}
   Mensagem:=createmessagedialog(txtMsg,MtConfirmation,[MbYes,MbNo]);
   {Trazur o titulo da mensagem}
@@ -5764,6 +5766,7 @@ begin
   result:=false;
   {Botão Não}
 end;
+
 procedure TWPPConnect.ShutDown(PWarning:Boolean);
 Var
   LForm  : Tform;
@@ -5820,7 +5823,7 @@ begin
     LForm.close;
 
     try {morte forcada}  //alteração em 17/07/2022📍
-      WinExec(PAnsiChar('TaskKill -f -im '+Application.ExeName+'.exe'), SW_HIDE);
+      WinExec(PAnsiChar(AnsiString('TaskKill -f -im '+Application.ExeName+'.exe')), SW_HIDE);
       Application.Terminate;
     finally
       WinExec(PAnsiChar('TaskKill -f -im '+Application.ExeName+'.exe'), SW_HIDE);
