@@ -6069,6 +6069,7 @@ function TUrlREST.GetUrl(const Purl: String): Boolean;
 var
   jsSL: TStringList;
 begin
+  jsSL:= nil; // pp: fix for E1036 Variable 'jsSL' might not have been initialized
   try
     FReturnUrl.DisposeOf;
     FReturnUrl := TMemoryStream.Create;

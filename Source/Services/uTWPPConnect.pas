@@ -5823,10 +5823,10 @@ begin
     LForm.close;
 
     try {morte forcada}  //alteração em 17/07/2022📍
-      WinExec(PAnsiChar(AnsiString('TaskKill -f -im '+Application.ExeName+'.exe')), SW_HIDE);
+      WinExec(PAnsiChar(AnsiString('TaskKill -f -im '+Application.ExeName+'.exe')), SW_HIDE); // pp: fixed E1044 Suspicious typecast of string to PAnsiChar
       Application.Terminate;
     finally
-      WinExec(PAnsiChar('TaskKill -f -im '+Application.ExeName+'.exe'), SW_HIDE);
+      WinExec(PAnsiChar(ansiString('TaskKill -f -im '+Application.ExeName+'.exe')), SW_HIDE); // pp: fixed E1044 Suspicious typecast of string to PAnsiChar
       Application.Terminate;
     end;
   finally
