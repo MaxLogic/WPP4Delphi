@@ -1118,7 +1118,7 @@ begin
   FInjectJS.OnErrorInternal        := Int_OnErroInterno;
   DirApp               := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName));
   try
-    MyIniFIle          := TIniFile.create(DirApp + NomeArquivoIni);
+    MyIniFIle          := TIniFile.create(ResolveWPPSettingsIniFileName(DirApp));
     HabEvento_msg_ack_change := MyIniFIle.ReadString('Config', 'Evento_msg_ack_change', '1') = '1';
     HabEvento_msg_revoke := MyIniFIle.ReadString('Config', 'Evento_msg_revoke', '1') = '1';
     HabEvento_new_message  := MyIniFIle.ReadString('Config', 'Evento_new_message', '1') = '1';
@@ -3869,7 +3869,7 @@ var
 begin
   try
     DirApp     := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName));
-    MyIniFIle  := TIniFile.create(DirApp + NomeArquivoIni);
+    MyIniFIle  := TIniFile.create(ResolveWPPSettingsIniFileName(DirApp));
     MyIniFIle.writeString(SectionName, key, value);
     MyIniFIle.Free;
   except on E: Exception do

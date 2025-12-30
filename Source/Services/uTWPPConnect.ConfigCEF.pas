@@ -246,6 +246,13 @@ Procedure TCEFConfig.SetDefault;
 var
   ctx: TRttiContext;
   prop: TRttiProperty;
+  lFramework: string;
+  lResources: string;
+  lLocales: string;
+  lCache: string;
+  lUserData: string;
+  lLogFile: string;
+  lLogConsole: string;
 begin
   ctx := TRttiContext.Create;
   try
@@ -276,13 +283,29 @@ begin
     SetEnableGPU            := FIniFIle.ReadBool  ('Path Defines', 'GPU',                 True);
     SetLogSeverity          := FIniFIle.ReadBool  ('Path Defines', 'Log Severity',        False);
     LogConsoleActive        := FIniFIle.ReadBool  ('Path Defines', 'Log Console Active',  False);
-    PathFrameworkDirPath    := FIniFIle.ReadString('Path Defines', 'FrameWork', '');
-    PathResourcesDirPath    := FIniFIle.ReadString('Path Defines', 'Binary',    '');
-    PathLocalesDirPath      := FIniFIle.ReadString('Path Defines', 'Locales',   '');
-    Pathcache               := FIniFIle.ReadString('Path Defines', 'Cache',     '');
-    PathUserDataPath        := FIniFIle.ReadString('Path Defines', 'Data User', '');
-    PathLogFile             := FIniFIle.ReadString('Path Defines', 'Log File',  '');
-    LogConsole              := FIniFIle.ReadString('Path Defines', 'Log Console',  '');
+    lFramework              := FIniFIle.ReadString('Path Defines', 'FrameWork', '');
+    lResources              := FIniFIle.ReadString('Path Defines', 'Binary',    '');
+    lLocales                := FIniFIle.ReadString('Path Defines', 'Locales',   '');
+    lCache                  := FIniFIle.ReadString('Path Defines', 'Cache',     '');
+    lUserData               := FIniFIle.ReadString('Path Defines', 'Data User', '');
+    lLogFile                := FIniFIle.ReadString('Path Defines', 'Log File',  '');
+    lLogConsole             := FIniFIle.ReadString('Path Defines', 'Log Console',  '');
+
+    // Preserve values pre-configured by the host app; only use INI defaults when empty.
+    if (FPathFrameworkDirPath = '') and (lFramework <> '') then
+      PathFrameworkDirPath := lFramework;
+    if (FPathResourcesDirPath = '') and (lResources <> '') then
+      PathResourcesDirPath := lResources;
+    if (FPathLocalesDirPath = '') and (lLocales <> '') then
+      PathLocalesDirPath := lLocales;
+    if (FPathCache = '') and (lCache <> '') then
+      Pathcache := lCache;
+    if (FPathUserDataPath = '') and (lUserData <> '') then
+      PathUserDataPath := lUserData;
+    if (FPathLogFile = '') and (lLogFile <> '') then
+      PathLogFile := lLogFile;
+    if (FLogConsole = '') and (lLogConsole <> '') then
+      LogConsole := lLogConsole;
 
     if LogConsole = '' then
        LogConsole := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName)) + 'LogTWppConnect\';
@@ -348,7 +371,7 @@ begin
   if not DirectoryExists(LDir) then
     //raise Exception.Create(Format(MSG_ExceptPath, [LDir]));
     //Aurino 11/07/2022
-    deletefile(pwidechar(ExtractFilePath(Application.ExeName) + NomeArquivoIni)) ;
+    deletefile(pwidechar(ResolveWPPSettingsIniFileName(ExtractFilePath(Application.ExeName)))) ;
   Result := true;
 end;
 
@@ -393,11 +416,18 @@ begin
 end;
 
 procedure TCEFConfig.SetPathCache(const Value: String);
+var
+  lDir: string;
 begin
+  if Trim(Value) = '' then
+    Exit;
+
   if AnsiLowerCase(FPathCache) = AnsiLowerCase(Value) Then
      Exit;
 
-  ForceDirectories(PWideChar(ExtractFilePath(Value)));
+  lDir := ExtractFilePath(Value);
+  if lDir <> '' then
+    ForceDirectories(PWideChar(lDir));
   if not TestaOk(FPathCache, Value) Then
      Exit;
   FPathCache            := Value;
@@ -433,7 +463,7 @@ begin
 
   FInDesigner          := False;
   FDirApp              := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName));
-  FIniFIle             := TIniFile.create(FDirApp + NomeArquivoIni);
+  FIniFIle             := TIniFile.create(ResolveWPPSettingsIniFileName(FDirApp));
   LFormatSettings      := IniDateTimeFormatSettings;
   Lx                   := FIniFIle.ReadString('TWPPConnect Comp', 'Ultima interação', '01/01/1500 05:00:00');
   //Lx                   := FIniFIle.ReadString('TWPPConnect Comp', 'Ultima interação', FormatDateTime('dd/mm/yy hh:nn:ss', FPathJsUpdate, LFormatSettings));

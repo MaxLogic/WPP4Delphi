@@ -169,7 +169,7 @@ var
 begin
   try
     DirApp               := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName));
-    MyIniFIle            := TIniFile.create(DirApp + NomeArquivoIni);
+    MyIniFIle            := TIniFile.create(ResolveWPPSettingsIniFileName(DirApp));
     Caminho_JS           := MyIniFIle.ReadString('TWPPConnect Comp', 'Caminho JS', TWPPConnectJS_JSUrlPadrao);
 
     MyIniFIle.Free;

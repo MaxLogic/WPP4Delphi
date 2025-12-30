@@ -64,7 +64,6 @@ Const
   JsonOptionClassPadrao           = [joDateIsUTC, joDateFormatISO8601, joIgnoreEmptyStrings, joIgnoreEmptyArrays];
   //ConsoleRetornText_Disconect      = 'failed: WebSocket is closed before the connection is established';
   FrmConsole_Browser_ContextPhoneOff = '<div class="_1fpj- app-wrapper-web">';
-
   FrmConsole_Browser_Created            = WM_APP + $100;
   FrmConsole_Browser_Direto             = WM_APP + $101;
   //MARCELO JS.ABR CUSTOMIZADO Marcelo 09/05/2022
@@ -926,6 +925,11 @@ resourcestring
   Text_FrmConfigNetWork_BntCancel        = '';
   Text_FrmConfigNetWork_QuestionSave     = '';
   Text_FrmConfigNetWork_PrtocolLbl       = '';
+
+var
+  gWPPSettingsIniFileName: string = '';
+
+function ResolveWPPSettingsIniFileName(const aDefaultDir: string): string;
 //  Text_FrmQRCode_OnCLose                 = '';
 //  Text_FrmQRCode_OnCLose                 = '';
 //  Text_FrmQRCode_OnCLose                 = '';
@@ -1052,6 +1056,16 @@ implementation
 
 uses
   System.JSON, System.Classes, Vcl.Dialogs, Vcl.Forms, Winapi.Windows, uTWPPConnect.ConfigCEF;
+
+function ResolveWPPSettingsIniFileName(const aDefaultDir: string): string;
+var
+  lDir: string;
+begin
+  if Trim(gWPPSettingsIniFileName) <> '' then
+    Exit(gWPPSettingsIniFileName);
+  lDir := IncludeTrailingPathDelimiter(aDefaultDir);
+  Result := lDir + NomeArquivoIni;
+end;
 
 
 Function VerificaCompatibilidadeVersao(PVersaoExterna:String; PversaoInterna:String):Boolean;
