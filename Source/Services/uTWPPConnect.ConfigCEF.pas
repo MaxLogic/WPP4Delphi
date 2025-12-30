@@ -156,6 +156,17 @@ implementation
 uses
   uCEFTypes, Vcl.Dialogs, uTWPPConnect.Diversos;
 
+function IniDateTimeFormatSettings: TFormatSettings;
+begin
+  Result := TFormatSettings.Create;
+  Result.DateSeparator := '/';
+  Result.TimeSeparator := ':';
+  Result.ShortDateFormat := 'dd/mm/yy';
+  Result.LongDateFormat := 'dd/mm/yy';
+  Result.ShortTimeFormat := 'hh:nn:ss';
+  Result.LongTimeFormat := 'hh:nn:ss';
+end;
+
 { TCEFConfig }
 
 procedure DestroyGlobalCEFApp;
@@ -165,9 +176,12 @@ begin
 end;
 
 procedure TCEFConfig.UpdateDateIniFile;
+var
+  LFormatSettings: TFormatSettings;
 begin
   FPathJsUpdate := Now;
-  UpdateIniFile('TWPPConnect Comp', 'Ultima interação', FormatDateTime('dd/mm/yy hh:nn:ss', FPathJsUpdate));
+  LFormatSettings := IniDateTimeFormatSettings;
+  UpdateIniFile('TWPPConnect Comp', 'Ultima interação', FormatDateTime('dd/mm/yy hh:nn:ss', FPathJsUpdate, LFormatSettings));
 end;
 
 procedure TCEFConfig.UpdateIniFile(const PSection, PKey, PValue: String);
@@ -401,6 +415,7 @@ var
   Linicio: Cardinal;
   LVReque, LVerIdent: String;
   FDirApp, Lx, Caminho_JS: String;
+  LFormatSettings: TFormatSettings;
 var
   ctx: TRttiContext;
   prop: TRttiProperty;
@@ -419,8 +434,9 @@ begin
   FInDesigner          := False;
   FDirApp              := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName));
   FIniFIle             := TIniFile.create(FDirApp + NomeArquivoIni);
+  LFormatSettings      := IniDateTimeFormatSettings;
   Lx                   := FIniFIle.ReadString('TWPPConnect Comp', 'Ultima interação', '01/01/1500 05:00:00');
-  //Lx                   := FIniFIle.ReadString('TWPPConnect Comp', 'Ultima interação', FormatDateTime('dd/mm/yy hh:nn:ss', FPathJsUpdate));
+  //Lx                   := FIniFIle.ReadString('TWPPConnect Comp', 'Ultima interação', FormatDateTime('dd/mm/yy hh:nn:ss', FPathJsUpdate, LFormatSettings));
 
   Caminho_JS           := FIniFIle.ReadString('TWPPConnect Comp', 'Caminho JS', TWPPConnectJS_JSUrlPadrao);
 
@@ -428,7 +444,7 @@ begin
   FPathJS              := FDirApp + NomeArquivoInject;
   FErrorInt            := False;
   FStartTimeOut        := 5000; //(+- 5 Segundos)
-  FPathJsUpdate        := StrToDateTimeDef(Lx, StrTodateTime('01/01/1500 00:00'));
+  FPathJsUpdate        := StrToDateTimeDef(Lx, EncodeDateTime(1500, 1, 1, 0, 0, 0, 0), LFormatSettings);
   //FPathJsUpdate        := StrToDateTimeDef(Lx, IncHour(now,-2));
   SetDefault;
 
