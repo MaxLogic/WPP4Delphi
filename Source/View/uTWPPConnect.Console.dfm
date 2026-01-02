@@ -37,8 +37,8 @@ object FrmConsole: TFrmConsole
     object Lbl_Caption: TLabel
       Left = 1
       Top = 1
-      Width = 627
-      Height = 18
+      Width = 106
+      Height = 13
       Align = alClient
       Alignment = taCenter
       Caption = 'Mega Online Software'
@@ -50,8 +50,6 @@ object FrmConsole: TFrmConsole
       ParentFont = False
       Layout = tlCenter
       OnClick = Lbl_CaptionClick
-      ExplicitWidth = 106
-      ExplicitHeight = 13
     end
     object lbl_Versao: TLabel
       AlignWithMargins = True
@@ -75,7 +73,6 @@ object FrmConsole: TFrmConsole
       Layout = tlCenter
       WordWrap = True
       OnMouseEnter = lbl_VersaoMouseEnter
-      ExplicitLeft = 712
     end
     object Img_LogoInject: TImage
       Left = 29
@@ -400,7 +397,7 @@ object FrmConsole: TFrmConsole
       Left = 631
       Top = 4
       Width = 3
-      Height = 12
+      Height = 13
       Margins.Right = 6
       Align = alRight
       Alignment = taCenter
@@ -412,7 +409,6 @@ object FrmConsole: TFrmConsole
       ParentFont = False
       Layout = tlCenter
       OnClick = Lbl_CaptionClick
-      ExplicitHeight = 13
     end
     object bInfo: TBitBtn
       Left = 640

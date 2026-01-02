@@ -46,6 +46,7 @@ type
   TOnGetCheckIsConnected    = Procedure(Sender : TObject; Connected: Boolean) of object;
   TOnGetCheckIsValidNumber  = Procedure(Sender : TObject; Number: String;  IsValid: Boolean) of object;
   TOnRetErrorWhiteScreen = Procedure(Sender : TObject; Response: string) of object;
+  TOnBrowserConsoleMessage = procedure(Sender : TObject; const MessageText, Source: string; Line: Integer; Level: Integer) of object;
   //TOnGetProfilePicThumb     = Procedure(Sender : TObject; Base64: String) of object;
   //Alterado Marcelo 01/06/2022
   TOnGetProfilePicThumb     = Procedure(Sender : TObject; ProfilePicThumb: TResponseGetProfilePicThumb) of object;
@@ -215,6 +216,7 @@ type
     FOnConnected                : TNotifyEvent;
     FOnDisconnected             : TNotifyEvent;
     FOnErroInternal             : TOnErroInternal;
+    FOnBrowserConsoleMessage     : TOnBrowserConsoleMessage;
     FOnAfterInjectJs            : TNotifyEvent;
     FOnAfterInitialize          : TNotifyEvent;
     FOnGetStatusMessage         : TOnGetStatusMessage;
@@ -572,6 +574,7 @@ type
     property OnDisconnected              : TNotifyEvent               read FOnDisconnected                 write FOnDisconnected;
     property OnDisconnectedBrute         : TNotifyEvent               read FOnDisconnectedBrute            write FOnDisconnectedBrute;
     property OnErroAndWarning            : TOnErroInternal            read FOnErroInternal                 write FOnErroInternal;
+    property OnBrowserConsoleMessage      : TOnBrowserConsoleMessage   read FOnBrowserConsoleMessage       write FOnBrowserConsoleMessage;
     property OnGetStatusMessage          : TOnGetStatusMessage        read FOnGetStatusMessage             write FOnGetStatusMessage;
     property OnGetInviteGroup            : TOnGetInviteGroup          read FOnGetInviteGroup               write FOnGetInviteGroup;
     property OnGetMe                     : TOnGetMe                   read FOnGetMe                        write FOnGetMe;
@@ -5665,23 +5668,20 @@ begin
 end;
 function TWPPConnect.GetAppShowing: Boolean;
 var
-  lForm: Tform;
+  lForm: TForm;
 begin
   Result := False;
-  lForm  := nil;
-  try
-    try
-      case FFormQrCodeType of
-        Ft_Desktop : lForm := FrmConsole.FormQrCode;
-        Ft_Http    : lForm := FrmConsole;
-      end;
-    finally
-     if Assigned(lForm) then
-        Result := lForm.Showing;
-    end;
-  except
-    Result := False;
+  if not Assigned(FrmConsole) then
+    Exit;
+
+  lForm := nil;
+  case FFormQrCodeType of
+    Ft_Desktop : lForm := FrmConsole.FormQrCode;
+    Ft_Http    : lForm := FrmConsole;
   end;
+
+  if Assigned(lForm) then
+    Result := lForm.Showing;
 end;
 procedure TWPPConnect.OnTimerWPPCrash(Sender: TObject);
 begin

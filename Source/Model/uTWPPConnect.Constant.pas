@@ -1,4 +1,4 @@
-﻿{####################################################################################################################
+{####################################################################################################################
   License
   Copyright 2022 WPPConnect Team https://wppconnect-team.github.io/
 
@@ -10,7 +10,7 @@
   an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
   specific language governing permissions and limitations under the License.
 
-                              WPPCONNECT - Componente de comunicação (Não Oficial)
+                              WPPCONNECT - Componente de comunica�ao (Nao Oficial)
                                            https://wppconnect-team.github.io/
                                             Maio de 2022
 ####################################################################################################################
@@ -19,17 +19,17 @@
                 Daniel Oliveira Rodrigues  - Dor_poa@hotmail.com     - +55 51 9.9155-9228
 ####################################################################################################################
   Obs:
-     - Código aberto a comunidade Delphi, desde que mantenha os dados dos autores e mantendo sempre o nome do IDEALIZADOR
+     - C�digo aberto a comunidade Delphi, desde que mantenha os dados dos autores e mantendo sempre o nome do IDEALIZADOR
        Mike W. Lustosa;
 
 ####################################################################################################################
-                                  Evolução do Código
+                                  Evolu�ao do C�digo
 ####################################################################################################################
   Autor........: Marcelo Oliveira
   Email........: marcelo.broz@hotmail.com
   Data.........: 07/06/2022
   Identificador: @Marcelo
-  Modificação..: Ajustado para Trabalhar com o WPPConnect
+  Modifica�ao..: Ajustado para Trabalhar com o WPPConnect
 ####################################################################################################################
 }
 unit uTWPPConnect.Constant;
@@ -88,7 +88,7 @@ Const
 
   FrmConsole_JS_GetAllContacts          = 'window.WAPI.getAllContacts();';
   FrmConsole_JS_GetMyContacts           = 'window.WAPI.getMyContacts();'; //01/07/2023
-  FrmConsole_JS_GetBatteryLevel         = ''; //'window.WAPI.getBatteryLevel();'; //Não Habilitar Função deprecated GetBatteryLevel
+  FrmConsole_JS_GetBatteryLevel         = ''; //'window.WAPI.getBatteryLevel();'; //Nao Habilitar Fun�ao deprecated GetBatteryLevel
   FrmConsole_JS_GetMyNumber             = 'getMyNumber();';
   FrmConsole_JS_GetUnreadMessages       = 'window.WAPI.getUnreadMessages(includeMe="True", includeNotifications="True", use_unread_count="True");';
   //FrmConsole_JS_GetUnreadMessages       = '';
@@ -99,50 +99,223 @@ Const
 
   FrmConsole_JS_GetAllChats             = 'window.WAPI.getAllChats();';
   FrmConsole_JS_checkDelivered          = 'window.WAPI.getDelivered();';
-  //FrmConsole_JS_WEBmonitorQRCode        = 'var AQrCode = document.getElementsByTagName("canvas")[0].toDataURL("image/png");console.log(JSON.stringify({"name":"getQrCodeWEB","result":{AQrCode}}));';
-
   //Marcelo 05/05/2023
-  FrmConsole_JS_WEBmonitorQRCode         = ' var canvas = document.getElementsByTagName("canvas")[0]; if (canvas) { var AQrCode = canvas.toDataURL("image/png"); var result = { AQrCode: AQrCode }; ' +
-                                               'console.log(JSON.stringify({ name: "getQrCodeWEB", result: result }));} else {}';
-                                               //'console.log(JSON.stringify({ name: "getQrCodeWEB", result: result }));} else {console.log("Canvas element not found.");}';
-
-  //FrmConsole_JS_refreshOnlyQRCode       = 'interval = window.setInterval(async function(){new Promise((resolve, reject)=>{let all = []; all = document.querySelectorAll("button"); if(all[0]){ all[0].click() }})},60000)';
-  //FrmConsole_JS_refreshOnlyQRCode       = ' interval = window.setInterval(async function() {new Promise((resolve, reject) =>{let all = []; all = document.querySelector("button"); if (all) { if (all.text.includes("recarregar")) { all.click() } } })}, 60000);';
+  FrmConsole_JS_WEBmonitorQRCode         = '' +
+                                               '(function(){ try { ' +
+                                               '  var min = 160; var maxDelta = 12; var maxItems = 5; ' +
+                                               '  var isSquare = function(w,h){ return w>=min && h>=min && Math.abs(w-h)<=maxDelta; }; ' +
+                                               '  var safeTxt = function(s){ if (!s) { return ""; } s = "" + s; if (s.length > 80) { s = s.substring(0,80); } return s; }; ' +
+                                               '  var safeTxtN = function(s,n){ if (!s) { return ""; } s = "" + s; if (s.length > n) { s = s.substring(0,n); } return s; }; ' +
+                                               '  var dbg = { auth: null, counts: { canvas: 0, img: 0, svg: 0 }, canvases: [], imgs: [], svgs: [] }; ' +
+                                               '  try { dbg.url = safeTxtN((location && location.href) ? location.href : "", 200); dbg.title = safeTxtN(document.title || "", 120); dbg.ready = safeTxtN(document.readyState || "", 20); } catch (e) {} ' +
+                                               '  try { dbg.lang = safeTxtN((document.documentElement && document.documentElement.lang) ? document.documentElement.lang : "", 20); } catch (e) {} ' +
+                                               '  try { dbg.hasWPP = !!window.WPP; dbg.hasWAPI = !!window.WAPI; } catch (e) {} ' +
+                                               '  try { var b = document.body; dbg.bodyText = safeTxtN(b ? b.innerText : "", 200); dbg.bodyHtml = safeTxtN(b ? b.innerHTML : "", 200); } catch (e) {} ' +
+                                               '  try { if (window.WPP && WPP.conn && typeof WPP.conn.isAuthenticated === "function") { dbg.auth = WPP.conn.isAuthenticated(); } } catch (e) {} ' +
+                                               '  var pushLim = function(arr, obj){ if (arr.length < maxItems) { arr.push(obj); } }; ' +
+                                               '  var hasQrLabel = function(el){ ' +
+                                               '    var label = (el.getAttribute && (el.getAttribute("aria-label") || el.getAttribute("alt") || el.getAttribute("title")) || "").toLowerCase(); ' +
+                                               '    return (label.indexOf("qr") >= 0) || (label.indexOf("scan") >= 0) || (label.indexOf("scann") >= 0) || (label.indexOf("code") >= 0); ' +
+                                               '  }; ' +
+                                               '  var send = function(data, force){ ' +
+                                               '    var v = (typeof data === "string") ? data : (data ? ("" + data) : ""); ' +
+                                               '    if (!force && (v === "")) { ' +
+                                               '      var now = Date.now ? Date.now() : (new Date()).getTime(); ' +
+                                               '      if (window.__wppqrdbg && (now - window.__wppqrdbg) < 2000) { return; } ' +
+                                               '      window.__wppqrdbg = now; ' +
+                                               '    } ' +
+                                               '    console.log(JSON.stringify({ name: "getQrCodeWEB", result: { AQrCode: v, Debug: dbg } })); ' +
+                                               '  }; ' +
+                                               '  var list = document.querySelectorAll("canvas"); ' +
+                                               '  dbg.counts.canvas = list.length; ' +
+                                               '  var c0 = null; ' +
+                                               '  for (var i = 0; i < list.length; i++) { ' +
+                                               '    var c = list[i]; if (!c || !c.toDataURL) { continue; } ' +
+                                               '    var w = c.width || c.clientWidth || 0; var h = c.height || c.clientHeight || 0; ' +
+                                               '    var ref = c.getAttribute("data-ref") || ""; ' +
+                                               '    var role = (c.getAttribute("role") || "").toLowerCase(); ' +
+                                               '    var label = (c.getAttribute("aria-label") || c.getAttribute("alt") || c.getAttribute("title") || ""); ' +
+                                               '    var idc = c.id || ""; var clsc = c.className || ""; ' +
+                                               '    pushLim(dbg.canvases, { w: w, h: h, ref: safeTxt(ref), role: role, label: safeTxt(label), id: safeTxt(idc), cls: safeTxt(clsc) }); ' +
+                                               
+                                               '    if (!c0 && ((ref && ref.length > 10) || hasQrLabel(c) || (role === "img"))) { c0 = c; } ' +
+                                               '  } ' +
+                                               '  if (!c0) { ' +
+                                               '    var host = document.querySelector("[data-ref]"); ' +
+                                               '    if (host && host.querySelector) { ' +
+                                               '      var c2 = host.querySelector("canvas"); if (c2 && c2.toDataURL) { c0 = c2; } ' +
+                                               '    } ' +
+                                               '  } ' +
+                                               '  if (c0) { ' +
+                                               '    var w0 = c0.width || c0.clientWidth || 0; var h0 = c0.height || c0.clientHeight || 0; ' +
+                                               '    if (isSquare(w0, h0)) { ' +
+                                               '      var d0 = c0.toDataURL("image/png"); if (d0 && d0.indexOf("data:image") === 0) { send(d0, true); return; } ' +
+                                               '    } ' +
+                                               '  } ' +
+                                               '  var imgs = document.querySelectorAll("img"); ' +
+                                               '  dbg.counts.img = imgs.length; ' +
+                                               '  var bestImg = null; var bestImgArea = 0; ' +
+                                               '  for (var j = 0; j < imgs.length; j++) { ' +
+                                               '    var img = imgs[j]; if (!img || !img.src) { continue; } ' +
+                                               '    var src = img.src; ' +
+                                               '    var kind = (src.indexOf("data:image") === 0) ? "data" : ((src.indexOf("blob:") === 0) ? "blob" : ((src.indexOf("http") === 0) ? "http" : "other")); ' +
+                                               '    var iw = img.naturalWidth || img.width || 0; var ih = img.naturalHeight || img.height || 0; ' +
+                                               '    var label2 = (img.getAttribute("aria-label") || img.getAttribute("alt") || img.getAttribute("title") || ""); ' +
+                                               '    var idm = img.id || ""; var clsm = img.className || ""; ' +
+                                               '    pushLim(dbg.imgs, { w: iw, h: ih, kind: kind, label: safeTxt(label2), srcLen: src ? src.length : 0, srcHead: safeTxt(src), id: safeTxt(idm), cls: safeTxt(clsm) }); ' +
+                                               
+                                               '    if (!hasQrLabel(img)) { continue; } ' +
+                                               '    var isData = (src.indexOf("data:image") === 0) || (src.indexOf("blob:") === 0); ' +
+                                               '    if (!isData) { continue; } ' +
+                                               '    if (!isSquare(iw, ih)) { continue; } ' +
+                                               '    var areaImg = iw * ih; if (areaImg > bestImgArea) { bestImgArea = areaImg; bestImg = img; } ' +
+                                               '  } ' +
+                                               '  if (bestImg) { ' +
+                                               '    var src2 = bestImg.src; ' +
+                                               '    if (src2.indexOf("data:image") === 0) { send(src2, true); return; } ' +
+                                               '    if (src2.indexOf("blob:") === 0 && window.fetch) { ' +
+                                               '      fetch(src2).then(function(r){ return r.blob(); }).then(function(b){ ' +
+                                               '        var fr = new FileReader(); fr.onload = function(){ send(fr.result, true); }; fr.readAsDataURL(b); ' +
+                                               '      }); return; ' +
+                                               '    } ' +
+                                               '  } ' +
+                                               '  var svgs = document.querySelectorAll("svg"); ' +
+                                               '  dbg.counts.svg = svgs.length; ' +
+                                               '  var bestSvg = null; var bestSvgArea = 0; ' +
+                                               '  for (var k = 0; k < svgs.length; k++) { ' +
+                                               '    var s = svgs[k]; if (!s || !s.querySelectorAll) { continue; } ' +
+                                               '    var rectCount = s.querySelectorAll("rect").length; ' +
+                                               '    var rect = s.getBoundingClientRect ? s.getBoundingClientRect() : null; ' +
+                                               '    var sw = rect ? rect.width : (s.clientWidth || 0); var sh = rect ? rect.height : (s.clientHeight || 0); ' +
+                                               '    pushLim(dbg.svgs, { w: sw, h: sh, rects: rectCount }); ' +
+                                               '    if (rectCount < 20) { continue; } ' +
+                                               '    if (!isSquare(sw, sh)) { continue; } ' +
+                                               '    var areaSvg = sw * sh; if (areaSvg > bestSvgArea) { bestSvgArea = areaSvg; bestSvg = s; } ' +
+                                               '  } ' +
+                                               '  if (bestSvg && window.XMLSerializer) { ' +
+                                               '    var xml = new XMLSerializer().serializeToString(bestSvg); ' +
+                                               '    var svg64 = btoa(unescape(encodeURIComponent(xml))); ' +
+                                               '    var svgData = "data:image/svg+xml;base64," + svg64; ' +
+                                               '    var img2 = new Image(); ' +
+                                               '    img2.onload = function(){ ' +
+                                               '      var c3 = document.createElement("canvas"); c3.width = img2.width; c3.height = img2.height; ' +
+                                               '      var ctx2 = c3.getContext("2d"); if (ctx2) { ctx2.drawImage(img2, 0, 0); var png = c3.toDataURL("image/png"); send(png, true); } ' +
+                                               '    }; ' +
+                                               '    img2.src = svgData; return; ' +
+                                               '  } ' +
+                                               '  send("", false); ' +
+                                               '} catch (e) {} })(); ';
+//FrmConsole_JS_refreshOnlyQRCode       = 'interval = window.setInterval(async function(){new Promise((resolve, reject)=>{let all = []; all = document.querySelectorAll("button"); if(all[0]){ all[0].click() }})},60000)';
+//FrmConsole_JS_refreshOnlyQRCode       = ' interval = window.setInterval(async function() {new Promise((resolve, reject) =>{let all = []; all = document.querySelector("button"); if (all) { if (all.text.includes("recarregar")) { all.click() } } })}, 60000);';
 
   //Marcelo 05/05/2023
   FrmConsole_JS_refreshOnlyQRCode        = 'interval = window.setInterval(async function() { await new Promise((resolve, reject) => {let all = Array.from(document.querySelectorAll("button")); if (all[0]) {if (all.some(btn => btn.textContent.includes("recarregar")))' + ' {all[0].click();}}resolve();});}, 60000);';
-  //FrmConsole_JS_monitorQRCode           = ''; //'var AQrCode = document.getElementsByTagName("canvas")[0].toDataURL("image/png");console.log(JSON.stringify({"name":"getQrCode","result":{AQrCode}}));';
-
   //Marcelo 05/05/2023
-  FrmConsole_JS_monitorQRCode            = ' var canvas = document.getElementsByTagName("canvas")[0]; if (canvas) { var AQrCode = canvas.toDataURL("image/png"); var result = { AQrCode: AQrCode }; ' +
-                                               'console.log(JSON.stringify({ name: "getQrCodeWEB", result: result }));} else {}';
-                                               //'console.log(JSON.stringify({ name: "getQrCodeWEB", result: result }));} else {console.log("Canvas element not found.");}';
-
-
-  (*'document.addEventListener("DOMContentLoaded", () => { ' +
-    '  const observer = new MutationObserver(() => { ' +
-    '    element = document.getElementById("pane-side"); ' +
-    '    if (element) { ' +
-    //'      injectScript("js/wa-js.js").then(() => { ' +
-    '        console.log("isReady"); ' +
-    //'        setTimeout(() => { ' +
-    //'          console.log("inject"); ' +
-    //'          console.log("cds inject"); ' +
-    //'          injectScript("js/cds.js"); ' +
-    //'        }, 5000); ' +
-    //'      }); ' +
-
-    '      observer.disconnect(); ' +
-    '    } ' +
-    '  }); ' +
-
-    '  observer.observe(document.body, { ' +
-    '    childList: true, ' +
-    '    subtree: true, ' +
-    '    }); ' +
-    '  }) ';
-
-    *)
+  FrmConsole_JS_monitorQRCode         = '' +
+                                               '(function(){ try { ' +
+                                               '  var min = 160; var maxDelta = 12; var maxItems = 5; ' +
+                                               '  var isSquare = function(w,h){ return w>=min && h>=min && Math.abs(w-h)<=maxDelta; }; ' +
+                                               '  var safeTxt = function(s){ if (!s) { return ""; } s = "" + s; if (s.length > 80) { s = s.substring(0,80); } return s; }; ' +
+                                               '  var safeTxtN = function(s,n){ if (!s) { return ""; } s = "" + s; if (s.length > n) { s = s.substring(0,n); } return s; }; ' +
+                                               '  var dbg = { auth: null, counts: { canvas: 0, img: 0, svg: 0 }, canvases: [], imgs: [], svgs: [] }; ' +
+                                               '  try { dbg.url = safeTxtN((location && location.href) ? location.href : "", 200); dbg.title = safeTxtN(document.title || "", 120); dbg.ready = safeTxtN(document.readyState || "", 20); } catch (e) {} ' +
+                                               '  try { dbg.lang = safeTxtN((document.documentElement && document.documentElement.lang) ? document.documentElement.lang : "", 20); } catch (e) {} ' +
+                                               '  try { dbg.hasWPP = !!window.WPP; dbg.hasWAPI = !!window.WAPI; } catch (e) {} ' +
+                                               '  try { var b = document.body; dbg.bodyText = safeTxtN(b ? b.innerText : "", 200); dbg.bodyHtml = safeTxtN(b ? b.innerHTML : "", 200); } catch (e) {} ' +
+                                               '  try { if (window.WPP && WPP.conn && typeof WPP.conn.isAuthenticated === "function") { dbg.auth = WPP.conn.isAuthenticated(); } } catch (e) {} ' +
+                                               '  var pushLim = function(arr, obj){ if (arr.length < maxItems) { arr.push(obj); } }; ' +
+                                               '  var hasQrLabel = function(el){ ' +
+                                               '    var label = (el.getAttribute && (el.getAttribute("aria-label") || el.getAttribute("alt") || el.getAttribute("title")) || "").toLowerCase(); ' +
+                                               '    return (label.indexOf("qr") >= 0) || (label.indexOf("scan") >= 0) || (label.indexOf("scann") >= 0) || (label.indexOf("code") >= 0); ' +
+                                               '  }; ' +
+                                               '  var send = function(data, force){ ' +
+                                               '    var v = (typeof data === "string") ? data : (data ? ("" + data) : ""); ' +
+                                               '    if (!force && (v === "")) { ' +
+                                               '      var now = Date.now ? Date.now() : (new Date()).getTime(); ' +
+                                               '      if (window.__wppqrdbg && (now - window.__wppqrdbg) < 2000) { return; } ' +
+                                               '      window.__wppqrdbg = now; ' +
+                                               '    } ' +
+                                               '    console.log(JSON.stringify({ name: "getQrCodeWEB", result: { AQrCode: v, Debug: dbg } })); ' +
+                                               '  }; ' +
+                                               '  var list = document.querySelectorAll("canvas"); ' +
+                                               '  dbg.counts.canvas = list.length; ' +
+                                               '  var c0 = null; ' +
+                                               '  for (var i = 0; i < list.length; i++) { ' +
+                                               '    var c = list[i]; if (!c || !c.toDataURL) { continue; } ' +
+                                               '    var w = c.width || c.clientWidth || 0; var h = c.height || c.clientHeight || 0; ' +
+                                               '    var ref = c.getAttribute("data-ref") || ""; ' +
+                                               '    var role = (c.getAttribute("role") || "").toLowerCase(); ' +
+                                               '    var label = (c.getAttribute("aria-label") || c.getAttribute("alt") || c.getAttribute("title") || ""); ' +
+                                               '    var idc = c.id || ""; var clsc = c.className || ""; ' +
+                                               '    pushLim(dbg.canvases, { w: w, h: h, ref: safeTxt(ref), role: role, label: safeTxt(label), id: safeTxt(idc), cls: safeTxt(clsc) }); ' +
+                                               
+                                               '    if (!c0 && ((ref && ref.length > 10) || hasQrLabel(c) || (role === "img"))) { c0 = c; } ' +
+                                               '  } ' +
+                                               '  if (!c0) { ' +
+                                               '    var host = document.querySelector("[data-ref]"); ' +
+                                               '    if (host && host.querySelector) { ' +
+                                               '      var c2 = host.querySelector("canvas"); if (c2 && c2.toDataURL) { c0 = c2; } ' +
+                                               '    } ' +
+                                               '  } ' +
+                                               '  if (c0) { ' +
+                                               '    var w0 = c0.width || c0.clientWidth || 0; var h0 = c0.height || c0.clientHeight || 0; ' +
+                                               '    if (isSquare(w0, h0)) { ' +
+                                               '      var d0 = c0.toDataURL("image/png"); if (d0 && d0.indexOf("data:image") === 0) { send(d0, true); return; } ' +
+                                               '    } ' +
+                                               '  } ' +
+                                               '  var imgs = document.querySelectorAll("img"); ' +
+                                               '  dbg.counts.img = imgs.length; ' +
+                                               '  var bestImg = null; var bestImgArea = 0; ' +
+                                               '  for (var j = 0; j < imgs.length; j++) { ' +
+                                               '    var img = imgs[j]; if (!img || !img.src) { continue; } ' +
+                                               '    var src = img.src; ' +
+                                               '    var kind = (src.indexOf("data:image") === 0) ? "data" : ((src.indexOf("blob:") === 0) ? "blob" : ((src.indexOf("http") === 0) ? "http" : "other")); ' +
+                                               '    var iw = img.naturalWidth || img.width || 0; var ih = img.naturalHeight || img.height || 0; ' +
+                                               '    var label2 = (img.getAttribute("aria-label") || img.getAttribute("alt") || img.getAttribute("title") || ""); ' +
+                                               '    var idm = img.id || ""; var clsm = img.className || ""; ' +
+                                               '    pushLim(dbg.imgs, { w: iw, h: ih, kind: kind, label: safeTxt(label2), srcLen: src ? src.length : 0, srcHead: safeTxt(src), id: safeTxt(idm), cls: safeTxt(clsm) }); ' +
+                                               
+                                               '    if (!hasQrLabel(img)) { continue; } ' +
+                                               '    var isData = (src.indexOf("data:image") === 0) || (src.indexOf("blob:") === 0); ' +
+                                               '    if (!isData) { continue; } ' +
+                                               '    if (!isSquare(iw, ih)) { continue; } ' +
+                                               '    var areaImg = iw * ih; if (areaImg > bestImgArea) { bestImgArea = areaImg; bestImg = img; } ' +
+                                               '  } ' +
+                                               '  if (bestImg) { ' +
+                                               '    var src2 = bestImg.src; ' +
+                                               '    if (src2.indexOf("data:image") === 0) { send(src2, true); return; } ' +
+                                               '    if (src2.indexOf("blob:") === 0 && window.fetch) { ' +
+                                               '      fetch(src2).then(function(r){ return r.blob(); }).then(function(b){ ' +
+                                               '        var fr = new FileReader(); fr.onload = function(){ send(fr.result, true); }; fr.readAsDataURL(b); ' +
+                                               '      }); return; ' +
+                                               '    } ' +
+                                               '  } ' +
+                                               '  var svgs = document.querySelectorAll("svg"); ' +
+                                               '  dbg.counts.svg = svgs.length; ' +
+                                               '  var bestSvg = null; var bestSvgArea = 0; ' +
+                                               '  for (var k = 0; k < svgs.length; k++) { ' +
+                                               '    var s = svgs[k]; if (!s || !s.querySelectorAll) { continue; } ' +
+                                               '    var rectCount = s.querySelectorAll("rect").length; ' +
+                                               '    var rect = s.getBoundingClientRect ? s.getBoundingClientRect() : null; ' +
+                                               '    var sw = rect ? rect.width : (s.clientWidth || 0); var sh = rect ? rect.height : (s.clientHeight || 0); ' +
+                                               '    pushLim(dbg.svgs, { w: sw, h: sh, rects: rectCount }); ' +
+                                               '    if (rectCount < 20) { continue; } ' +
+                                               '    if (!isSquare(sw, sh)) { continue; } ' +
+                                               '    var areaSvg = sw * sh; if (areaSvg > bestSvgArea) { bestSvgArea = areaSvg; bestSvg = s; } ' +
+                                               '  } ' +
+                                               '  if (bestSvg && window.XMLSerializer) { ' +
+                                               '    var xml = new XMLSerializer().serializeToString(bestSvg); ' +
+                                               '    var svg64 = btoa(unescape(encodeURIComponent(xml))); ' +
+                                               '    var svgData = "data:image/svg+xml;base64," + svg64; ' +
+                                               '    var img2 = new Image(); ' +
+                                               '    img2.onload = function(){ ' +
+                                               '      var c3 = document.createElement("canvas"); c3.width = img2.width; c3.height = img2.height; ' +
+                                               '      var ctx2 = c3.getContext("2d"); if (ctx2) { ctx2.drawImage(img2, 0, 0); var png = c3.toDataURL("image/png"); send(png, true); } ' +
+                                               '    }; ' +
+                                               '    img2.src = svgData; return; ' +
+                                               '  } ' +
+                                               '  send("", false); ' +
+                                               '} catch (e) {} })(); ';
   FrmConsole_JS_MonitorChatLoadComplete =
     'var observer;' + sLineBreak +
     '' + sLineBreak +
@@ -793,7 +966,7 @@ Const
 
   FrmConsole_JS_VAR_editMessageNew      = 'window.WPP.editMessageNew("<#MSG_UNIQUE_ID#>","<#MSG_NEW_MESSAGE#>",{<#MSG_OPTIONS#>},"<#MSG_SEUID#>", "<#MSG_SEUID2#>", "<#MSG_SEUID3#>", "<#MSG_SEUID4#>"  );';
 
-  FrmConsole_JS_VAR_forwardMessage      =  'WPP.chat.forwardMessage("<#MSG_PHONE#>","<#MSG_UNIQUE_ID#>" );';
+FrmConsole_JS_VAR_forwardMessage      =  'WPP.chat.forwardMessage("<#MSG_PHONE#>","<#MSG_UNIQUE_ID#>" );';
 
   //Marcelo 25/10/2022
   FrmConsole_JS_VAR_getList   = 'window.WAPI.list();';
@@ -856,7 +1029,7 @@ resourcestring
   MSG_ExceptNotAssignedOnGetQrCode     = '';
   Text_FrmClose_Caption                = '';
   Text_FrmClose_Label                  = '';
-  Text_FrmClose_WarningClose           = 'Fechar a aplicação?';
+  Text_FrmClose_WarningClose           = 'Fechar a aplica�ao?';
   Text_FrmQRCode_CaptionStart          = '';
   Text_FrmQRCode_CaptionSucess         = '';
   Text_FrmQRCode_OnCLose               = '';
@@ -1237,7 +1410,7 @@ Begin
 
   if Result  = Th_None Then
   Begin
-    //Acha por semelhança
+    //Acha por semelhan�a
     for I := 0 to LmaxCount do
     Begin
       LNome   := LowerCase(GetEnumName(TypeInfo(TTypeHeader), ord(TTypeHeader(i))));
@@ -1289,5 +1462,3 @@ end;
 
 
 end.
-
-

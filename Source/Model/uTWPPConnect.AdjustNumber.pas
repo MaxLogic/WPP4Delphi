@@ -1,4 +1,4 @@
-ï»¿{####################################################################################################################
+{####################################################################################################################
   License
   Copyright 2022 WPPConnect Team https://wppconnect-team.github.io/
 
@@ -10,28 +10,28 @@
   an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
   specific language governing permissions and limitations under the License.
 
-                              WPPCONNECT - Componente de comunicaÃ§Ã£o (NÃ£o Oficial)
+                              WPPCONNECT - Componente de comunicaçao (Nao Oficial)
                                            https://wppconnect-team.github.io/
                                             Maio de 2022
 ####################################################################################################################
     Owner.....: Daniel Oliveira Rodrigues  - Dor_poa@hotmail.com     - +55 51 9.9155-9228
     Developer.: Joathan Theiller           - jtheiller@hotmail.com   -
                 Mike W. Lustosa            - mikelustosa@gmail.com   - +55 81 9.9630-2385
-                Robson AndrÃ© de Morais     - robinhodemorais@gmail.com
+                Robson André de Morais     - robinhodemorais@gmail.com
 
 ####################################################################################################################
   Obs:
-     - CÃ³digo aberto a comunidade Delphi, desde que mantenha os dados dos autores e mantendo sempre o nome do IDEALIZADOR
+     - Código aberto a comunidade Delphi, desde que mantenha os dados dos autores e mantendo sempre o nome do IDEALIZADOR
        Mike W. Lustosa;
 
 ####################################################################################################################
-                                  EvoluÃ§Ã£o do CÃ³digo
+                                  Evoluçao do Código
 ####################################################################################################################
   Autor........: Marcelo Oliveira
   Email........: marcelo.broz@hotmail.com
   Data.........: 07/06/2022
   Identificador: @Marcelo
-  ModificaÃ§Ã£o..: Ajustado para Trabalhar com o WPPConnect
+  Modificaçao..: Ajustado para Trabalhar com o WPPConnect
 ####################################################################################################################
 }
 
@@ -111,13 +111,10 @@ begin
     if not AutoAdjust then
       Exit;
 
-    //Marcelo NÃ£o Validar NÃºmero ja Formatado 02/07/2023
-    if pos('@c.us', PNum) > 0 then
+    //Marcelo Nao Validar Número ja Formatado 02/07/2023
+    if pos('@', PNum) > 0 then
       Exit;
 
-    //Marcelo NÃ£o Validar ID de Grupo ja Formatado 01/08/2023
-    if pos('@g.us', PNum) > 0 then
-      Exit;
 
     //Garante valores LIMPOS (sem mascaras, letras, etc) apenas NUMEROS
     Result := PNum;
@@ -132,7 +129,7 @@ begin
       End;
     End;
 
-    //Testa se Ã© um grupo ou Lista Transmissao
+    //Testa se é um grupo ou Lista Transmissao
     if Length(LClearNum) <=  (LengthDDI + LengthDDD + LengthPhone + 1 + LInc) Then //14 then
     begin
       if (Length(LClearNum) <= (LengthDDD + LengthPhone + LInc)) or (Length(PNum) <= (LengthDDD + LengthPhone + LInc)) then
@@ -147,8 +144,13 @@ begin
     end;
   finally
     if Result = '' then
-      raise Exception.Create(MSG_ExceptPhoneNumberError);
-    SetPhone(Result);
+    begin
+      if AutoAdjust then
+        save_log(Format('AdjustNumber.FormatIn invalid: "%s"', [PNum]));
+      SetPhone('');
+    end
+    else
+      SetPhone(Result);
   end;
 end;
 

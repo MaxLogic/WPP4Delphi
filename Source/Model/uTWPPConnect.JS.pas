@@ -616,7 +616,23 @@ begin
 
   if FileExists(Source) then
   begin
-    FJSScript.LoadFromFile(Source);
+    try
+      FJSScript.LoadFromFile(Source, TEncoding.UTF8);
+      save_log('  JS.LoadFromFile UTF8 ok');
+    except on E: Exception do
+      begin
+        save_log('  JS.LoadFromFile UTF8 failed: ' + E.Message);
+        FJSScript.LoadFromFile(Source);
+      end;
+    end;
+    if Pos(#0, FJSScript.Text) > 0 then
+      save_log('  JS contains NUL (#0) byte');
+    if (FJSScript.Count > 0) and (FJSScript[0] <> '') and (FJSScript[0][1] = #$FEFF) then
+    begin
+      FJSScript[0] := Copy(FJSScript[0], 2, MaxInt);
+      save_log('  JS BOM removed');
+    end;
+
 
     if not ValidaJs(FJSScript) then
     begin

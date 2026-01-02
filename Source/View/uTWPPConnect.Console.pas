@@ -19,7 +19,7 @@ unit uTWPPConnect.Console;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, System.TypInfo, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.ExtCtrls, StrUtils,
 
   uCEFWinControl, uCEFChromiumCore, uCEFTypes,
@@ -61,7 +61,7 @@ type
     procedure Chromium1AfterCreated(Sender: TObject;      const browser: ICefBrowser);
     procedure Chromium1BeforeClose(Sender: TObject; const browser: ICefBrowser);
     procedure Chromium1BeforePopup(Sender: TObject; const browser: ICefBrowser;
-      const frame: ICefFrame; const targetUrl, targetFrameName: ustring;
+      const frame: ICefFrame; popup_id: Integer; const targetUrl, targetFrameName: ustring;
       targetDisposition: TCefWindowOpenDisposition; userGesture: Boolean;
       const popupFeatures: TCefPopupFeatures; var windowInfo: TCefWindowInfo;
       var client: ICefClient; var settings: TCefBrowserSettings;
@@ -728,8 +728,6 @@ begin
 end;
 
 procedure TFrmConsole.ExecuteJS(PScript: string;  PDirect:  Boolean; Purl:String; pStartline: integer);
-var
-  lThread : TThread;
 begin
   if Assigned(GlobalCEFApp) then
   Begin
@@ -740,24 +738,8 @@ begin
   if not FConectado then
     raise Exception.Create(MSG_ConfigCEF_ExceptConnetServ);
 
-  If Chromium1.Browser <> nil then
-  begin
-     if PDirect Then
-     Begin
-       Chromium1.Browser.MainFrame.ExecuteJavaScript(PScript, Purl, pStartline);
-       Exit;
-     end;
-
-     lThread := TThread.CreateAnonymousThread(procedure
-        begin
-          TThread.Synchronize(nil, procedure
-          begin
-            if Assigned(FrmConsole) then
-               FrmConsole.Chromium1.Browser.MainFrame.ExecuteJavaScript(PScript, Purl, pStartline)
-          end);
-        end);
-     lThread.Start;
-  end;
+  if Chromium1.Browser <> nil then
+    Chromium1.Browser.MainFrame.ExecuteJavaScript(PScript, Purl, pStartline);
 end;
 
 procedure TFrmConsole.ExecuteJSDir(PScript: string; Purl: String; pStartline: integer);
@@ -772,8 +754,29 @@ end;
 
 procedure TFrmConsole.QRCodeForm_Start;
 begin
-  if FrmConsole_JS_monitorQRCode <> '' then
-    ExecuteJS(FrmConsole_JS_monitorQRCode, False);
+  if FrmConsole_JS_monitorQRCode = '' then
+    Exit;
+
+  if (Chromium1 = nil) or (Chromium1.Browser = nil) or (Chromium1.Browser.MainFrame = nil) then
+  begin
+    var LInitialized: Boolean;
+    LInitialized := False;
+    if Chromium1 <> nil then
+      LInitialized := Chromium1.Initialized;
+    save_log(Format('QRCodeForm_Start: browser not ready (Conectado=%s, Initialized=%s).', [
+      BoolToStr(FConectado, True),
+      BoolToStr(LInitialized, True)
+    ]));
+    Exit;
+  end;
+
+  save_log(Format('QRCodeForm_Start: exec QR monitor (len=%d).', [Length(FrmConsole_JS_monitorQRCode)]));
+  try
+    Chromium1.Browser.MainFrame.ExecuteJavaScript(FrmConsole_JS_monitorQRCode, '', 0);
+  except
+    on E: Exception do
+      save_log(Format('QRCodeForm_Start: exception %s: %s', [E.ClassName, E.Message]));
+  end;
 end;
 
 procedure TFrmConsole.OnTimerConnect(Sender: TObject);
@@ -894,14 +897,21 @@ end;
 
 procedure TFrmConsole.OnTimerGetQrCode(Sender: TObject);
 begin
+  
   TTimer(Sender).Enabled := False;
   try
+    save_log(Format('OnTimerGetQrCode: FormType=%d, Conectado=%s.', [
+      Ord(FFormType),
+      BoolToStr(FConectado, True)
+    ]));
     try
       if (FFormType in [Ft_Desktop, Ft_none]) Then
         QRCodeForm_Start
       else
         QRCodeWeb_Start; //deprecated
     Except
+      on E: Exception do
+        save_log(Format('OnTimerGetQrCode: exception %s: %s', [E.ClassName, E.Message]));
     end;
   finally
     TTimer(Sender).Enabled := True;
@@ -1034,8 +1044,12 @@ begin
 
   if (TQR_Http in TQrCodeClass(pClass).Tags) or (TQR_Img in TQrCodeClass(pClass).Tags) then
   Begin
-    FrmQRCode.hide;
-    Exit;
+    if FFormType = Ft_Http then
+    begin
+      FrmQRCode.hide;
+      Exit;
+    end;
+    // For desktop QR, keep the form visible and continue processing.
   End;
 
   try
@@ -2837,7 +2851,7 @@ end;
 
 
 procedure TFrmConsole.Chromium1BeforePopup(Sender: TObject;
-  const browser: ICefBrowser; const frame: ICefFrame; const targetUrl,
+  const browser: ICefBrowser; const frame: ICefFrame; popup_id: Integer; const targetUrl,
   targetFrameName: ustring; targetDisposition: TCefWindowOpenDisposition;
   userGesture: Boolean; const popupFeatures: TCefPopupFeatures;
   var windowInfo: TCefWindowInfo; var client: ICefClient;
@@ -2971,7 +2985,19 @@ begin
 
 
    If not (PResponse.TypeHeader in [Th_getQrCodeForm, Th_getQrCodeWEB]) Then
-      FrmQRCode.Hide;
+   begin
+     if FFormType = Ft_Http then
+     begin
+       save_log(Format('QRCode hide (http): header=%s', [
+         string(GetEnumName(TypeInfo(TTypeHeader), Ord(PResponse.TypeHeader)))
+       ]));
+       FrmQRCode.Hide;
+     end
+     else
+       save_log(Format('QRCode keep (desktop): header=%s', [
+         string(GetEnumName(TypeInfo(TTypeHeader), Ord(PResponse.TypeHeader)))
+       ]));
+   end;
 
    Case PResponse.TypeHeader of
 
@@ -3897,6 +3923,12 @@ procedure TFrmConsole.Chromium1ConsoleMessage(Sender: TObject;
 var
   AResponse  : TResponseConsoleMessage;
 begin
+  try
+    if Assigned(TWPPConnect(FOwner).OnBrowserConsoleMessage) then
+      TWPPConnect(FOwner).OnBrowserConsoleMessage(FOwner, message, source, line, Ord(level));
+  except
+  end;
+
   //if POS('getUnreadMessages', message) = 0 then
     //LogAdd(message, 'CONSOLE GERAL');
 
@@ -4094,6 +4126,12 @@ procedure TFrmConsole.Chromium1ConsoleMessage(Sender: TObject;
 var
   AResponse  : TResponseConsoleMessage;
 begin
+  try
+    if Assigned(TWPPConnect(FOwner).OnBrowserConsoleMessage) then
+      TWPPConnect(FOwner).OnBrowserConsoleMessage(FOwner, message, source, line, Integer(level));
+  except
+  end;
+
   //if POS('getUnreadMessages', message) = 0 then
     //LogAdd(message, 'CONSOLE GERAL');
 
