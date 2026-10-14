@@ -38,6 +38,12 @@
 *.rsm
 *.tds
 *.dcu
+
+# FPC/Lazarus compiler-generated binaries (safe to delete)
+*.ppu
+*.compiled
+*.rsj
+Packages/lib/
 *.lib
 *.a
 *.o
@@ -68,3 +74,7 @@ backup/
 modules/
 *.bak
 /Packages/23.0
+
+# Base RAG local (Scripts/rag) - gerada localmente, ver .claude/skills/wpp-rag-index
+Scripts/rag/*.sqlite
+Scripts/rag/__pycache__/

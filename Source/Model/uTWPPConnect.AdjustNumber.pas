@@ -38,10 +38,19 @@
 
 unit uTWPPConnect.AdjustNumber;
 
+{$IFDEF FPC}
+  {$MODE DELPHI}
+  {$MODESWITCH UNICODESTRINGS}
+{$ENDIF}
+
 interface
 
 uses
-  System.Classes, uTWPPConnect.Classes, System.MaskUtils, uTWPPConnect.Diversos;
+  {$IFDEF FPC}
+  Classes, uTWPPConnect.Classes, MaskEdit, uTWPPConnect.Diversos
+  {$ELSE}
+  System.Classes, uTWPPConnect.Classes, System.MaskUtils, uTWPPConnect.Diversos
+  {$ENDIF};
 
 
 {$M+}{$TYPEINFO ON}
@@ -91,7 +100,11 @@ type
 implementation
 
 uses
-  System.SysUtils, uTWPPConnect.Constant;
+  {$IFDEF FPC}
+  SysUtils, uTWPPConnect.Constant
+  {$ELSE}
+  System.SysUtils, uTWPPConnect.Constant
+  {$ENDIF};
 
 { TAdjustNumber }
 
@@ -111,8 +124,12 @@ begin
     if not AutoAdjust then
       Exit;
 
-    //Marcelo Nao Validar N�mero ja Formatado 02/07/2023
-    if pos('@', PNum) > 0 then
+    //Marcelo Não Validar Número já com o @lid 18/01/2026
+    if pos('@lid', AnsiLowerCase(PNum) ) > 0 then
+      Exit;
+
+    //Marcelo Não Validar Número ja Formatado 02/07/2023
+    if pos('@c.us', PNum) > 0 then
       Exit;
 
 

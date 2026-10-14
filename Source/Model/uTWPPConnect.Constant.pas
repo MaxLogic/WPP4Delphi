@@ -1,4 +1,4 @@
-{####################################################################################################################
+﻿{####################################################################################################################
   License
   Copyright 2022 WPPConnect Team https://wppconnect-team.github.io/
 
@@ -10,7 +10,7 @@
   an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
   specific language governing permissions and limitations under the License.
 
-                              WPPCONNECT - Componente de comunica�ao (Nao Oficial)
+                              WPPCONNECT - Componente de comunicação (Não Oficial)
                                            https://wppconnect-team.github.io/
                                             Maio de 2022
 ####################################################################################################################
@@ -19,20 +19,25 @@
                 Daniel Oliveira Rodrigues  - Dor_poa@hotmail.com     - +55 51 9.9155-9228
 ####################################################################################################################
   Obs:
-     - C�digo aberto a comunidade Delphi, desde que mantenha os dados dos autores e mantendo sempre o nome do IDEALIZADOR
+     - Código aberto a comunidade Delphi, desde que mantenha os dados dos autores e mantendo sempre o nome do IDEALIZADOR
        Mike W. Lustosa;
 
 ####################################################################################################################
-                                  Evolu�ao do C�digo
+                                  Evolução do Código
 ####################################################################################################################
   Autor........: Marcelo Oliveira
   Email........: marcelo.broz@hotmail.com
   Data.........: 07/06/2022
   Identificador: @Marcelo
-  Modifica�ao..: Ajustado para Trabalhar com o WPPConnect
+  Modificação..: Ajustado para Trabalhar com o WPPConnect
 ####################################################################################################################
 }
 unit uTWPPConnect.Constant;
+
+{$IFDEF FPC}
+  {$MODE DELPHI}
+  {$MODESWITCH UNICODESTRINGS}
+{$ENDIF}
 
 interface
 
@@ -42,20 +47,31 @@ Uses
   {$else}
     Winapi.Messages, System.SysUtils, typinfo, REST.Json
   {$ENDIF};
+
+{$IFDEF FPC}
+type
+  //Equivalente minimo a REST.Json.Types.TJsonOptions (Delphi), so para manter a
+  //assinatura dos construtores de uTWPPConnect.Classes.pas identica nos dois
+  //compiladores. No FPC essas opcoes nao tem efeito (o parse manual sob
+  //{$IFDEF FPC} nao usa REST.Json), servem so de compatibilidade de tipo.
+  TJsonOption  = (joDateIsUTC, joDateFormatISO8601, joIgnoreEmptyStrings, joIgnoreEmptyArrays);
+  TJsonOptions = set of TJsonOption;
+{$ENDIF}
+
 Const
   //Uso GLOBAL
                                   //Version updates I=HIGH, II=MEDIUM, III=LOW, IV=VERY LOW
-  TWPPConnectVersion              = '5.0.0.7'; //  04/12/2025
+  TWPPConnectVersion              = '5.3.2.0'; //  13/10/2026
   CardContact                     = '@c.us';
   CardGroup                       = '@g.us';
   CardList                        = '@broadcast';
   NomeArquivoInject               = 'js.abr';//'wppconnect-wa.js';
   NomeArquivoIni                  = 'ConfTWPPConnect.ini';
   MsMaxFindJSinDesigner           = 15000;//15000;
-  VersaoMinima_CF4_Major          = 78;
-  VersaoMinima_CF4_Minor          = 3;
-  VersaoMinima_CF4_Release        = 0;
-  Versao0porCasas                 = 3;
+  VersaoMinima_CF4_Major          = 109;
+  VersaoMinima_CF4_Minor          = 1;
+  VersaoMinima_CF4_Release        = 18;
+  Versao0porCasas                 = 0;
   MinutosCOnsideradoObsoletooJS   = 50;
   Enter                           = sLineBreak;
   ConfigCEF_Path_Locales          = 'locales';
@@ -64,6 +80,7 @@ Const
   JsonOptionClassPadrao           = [joDateIsUTC, joDateFormatISO8601, joIgnoreEmptyStrings, joIgnoreEmptyArrays];
   //ConsoleRetornText_Disconect      = 'failed: WebSocket is closed before the connection is established';
   FrmConsole_Browser_ContextPhoneOff = '<div class="_1fpj- app-wrapper-web">';
+
   FrmConsole_Browser_Created            = WM_APP + $100;
   FrmConsole_Browser_Direto             = WM_APP + $101;
   //MARCELO JS.ABR CUSTOMIZADO Marcelo 09/05/2022
@@ -88,7 +105,7 @@ Const
 
   FrmConsole_JS_GetAllContacts          = 'window.WAPI.getAllContacts();';
   FrmConsole_JS_GetMyContacts           = 'window.WAPI.getMyContacts();'; //01/07/2023
-  FrmConsole_JS_GetBatteryLevel         = ''; //'window.WAPI.getBatteryLevel();'; //Nao Habilitar Fun�ao deprecated GetBatteryLevel
+  FrmConsole_JS_GetBatteryLevel         = ''; //'window.WAPI.getBatteryLevel();'; //Não Habilitar Função deprecated GetBatteryLevel
   FrmConsole_JS_GetMyNumber             = 'getMyNumber();';
   FrmConsole_JS_GetUnreadMessages       = 'window.WAPI.getUnreadMessages(includeMe="True", includeNotifications="True", use_unread_count="True");';
   //FrmConsole_JS_GetUnreadMessages       = '';
@@ -757,22 +774,22 @@ Const
   FrmConsole_JS_VAR_CreateCommunity         = 'WPP.community.create("<#COMMUNITY_NAME#>", "<#DESCRIPTION#>", <#GROUP_NUMBERS#>);setTimeout(function(){ window.WAPI.getAllCommunitys(); }, 3000);';
   FrmConsole_JS_VAR_addSubgroups            = 'WPP.community.addSubgroups("<#COMMUNITY#>", <#GROUP_NUMBERS#>);setTimeout(function(){ window.WAPI.getAllCommunitys(); }, 3000);';
 
-  FrmConsole_JS_VAR_CreateGroup             = 'WPP.group.create("<#GROUP_NAME#>", "<#PARTICIPANT_NUMBER#>");setTimeout(function(){ window.WAPI.getAllGroups(); }, 3000);';
-  FrmConsole_JS_VAR_GroupMsgAdminOnly       = 'WPP.group.setProperty("<#GROUP_ID#>", ''announcement'', true);';
-  FrmConsole_JS_VAR_GroupMsgAll             = 'WPP.group.setProperty("<#GROUP_ID#>", ''announcement'', false);';
+  FrmConsole_JS_VAR_CreateGroup             = 'window.WPP.createGroupNew("<#GROUP_NAME#>","<#PARTICIPANT_NUMBER#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");setTimeout(function(){ window.WAPI.getAllGroups(); }, 3000);'; //Marcelo 10/10/2026 - retorno via GroupActionResponse
+  FrmConsole_JS_VAR_GroupMsgAdminOnly       = 'window.WPP.groupSetPropertyNew("<#GROUP_ID#>","announcement",true,"SET_ANNOUNCE","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");';
+  FrmConsole_JS_VAR_GroupMsgAll             = 'window.WPP.groupSetPropertyNew("<#GROUP_ID#>","announcement",false,"SET_ANNOUNCE","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");';
 
   FrmConsole_JS_GetAllGroups                = 'window.WAPI.getAllGroups();';//'window.WAPI.listMyGroups();';
   FrmConsole_JS_GetGroupAdmins              = 'window.WAPI.getGroupAdmins("<#GROUP_ID#>");';
   FrmConsole_JS_VAR_listGroupContacts       = 'window.WAPI.getGroupParticipantIDs("<#GROUP_ID#>");';
   FrmConsole_JS_VAR_GetAllParticipantsGroup = 'window.WAPI.getAllParticipantsGroup("<#GROUP_ID#>");';
 
-  FrmConsole_JS_VAR_groupAddParticipant     = 'WPP.group.addParticipants("<#GROUP_ID#>", "<#PARTICIPANT_NUMBER#>");setTimeout(function(){ window.WAPI.getGroupParticipantIDs("<#GROUP_ID#>"); }, 3000);';
-  FrmConsole_JS_VAR_groupRemoveParticipant  = 'WPP.group.removeParticipants("<#GROUP_ID#>", "<#PARTICIPANT_NUMBER#>");setTimeout(function(){ window.WAPI.getGroupParticipantIDs("<#GROUP_ID#>"); }, 3000);';
-  FrmConsole_JS_VAR_groupPromoteParticipant = 'WPP.group.promoteParticipants("<#GROUP_ID#>", "<#PARTICIPANT_NUMBER#>");setTimeout(function(){ window.WAPI.getGroupAdmins("<#GROUP_ID#>"); }, 3000);';
-  FrmConsole_JS_VAR_groupDemoteParticipant  = 'WPP.group.demoteParticipants("<#GROUP_ID#>", "<#PARTICIPANT_NUMBER#>");setTimeout(function(){ window.WAPI.getGroupAdmins("<#GROUP_ID#>"); }, 3000);';
-  FrmConsole_JS_VAR_groupLeave              = 'window.WAPI.leaveGroup("<#GROUP_ID#>");';
-  FrmConsole_JS_VAR_groupDelete             = 'window.WAPI.deleteConversation("<#GROUP_ID#>");setTimeout(function(){ window.WAPI.getAllGroups(); }, 3000);';
-  FrmConsole_JS_VAR_groupJoinViaLink        = 'window.WAPI.joinGroupViaLink("<#GROUP_LINK#>");setTimeout(function(){ window.WAPI.getAllGroups(); }, 3000);';
+  FrmConsole_JS_VAR_groupAddParticipant     = 'window.WPP.groupAddParticipantNew("<#GROUP_ID#>","<#PARTICIPANT_NUMBER#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");setTimeout(function(){ window.WAPI.getGroupParticipantIDs("<#GROUP_ID#>"); }, 3000);';
+  FrmConsole_JS_VAR_groupRemoveParticipant  = 'window.WPP.groupRemoveParticipantNew("<#GROUP_ID#>","<#PARTICIPANT_NUMBER#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");setTimeout(function(){ window.WAPI.getGroupParticipantIDs("<#GROUP_ID#>"); }, 3000);';
+  FrmConsole_JS_VAR_groupPromoteParticipant = 'window.WPP.groupPromoteParticipantNew("<#GROUP_ID#>","<#PARTICIPANT_NUMBER#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");setTimeout(function(){ window.WAPI.getGroupAdmins("<#GROUP_ID#>"); }, 3000);';
+  FrmConsole_JS_VAR_groupDemoteParticipant  = 'window.WPP.groupDemoteParticipantNew("<#GROUP_ID#>","<#PARTICIPANT_NUMBER#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");setTimeout(function(){ window.WAPI.getGroupAdmins("<#GROUP_ID#>"); }, 3000);';
+  FrmConsole_JS_VAR_groupLeave              = 'window.WPP.groupLeaveNew("<#GROUP_ID#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");';
+  FrmConsole_JS_VAR_groupDelete             = 'window.WPP.groupDeleteNew("<#GROUP_ID#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");setTimeout(function(){ window.WAPI.getAllGroups(); }, 3000);';
+  FrmConsole_JS_VAR_groupJoinViaLink        = 'window.WPP.groupJoinViaLinkNew("<#GROUP_LINK#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");setTimeout(function(){ window.WAPI.getAllGroups(); }, 3000);';
   FrmConsole_JS_VAR_setProfileName          = 'window.WAPI.setMyName("<#NEW_NAME#>");';
   FrmConsole_JS_VAR_setProfilePicture       = 'WPP.profile.setMyProfilePicture("<#BASE_64#>")';
   FrmConsole_JS_VAR_setMyStatus             = 'window.WAPI.setMyStatus("<#NEW_STATUS#>");';
@@ -784,20 +801,28 @@ Const
   FrmConsole_JS_VAR_genLinkDeviceCodeForPhoneNumber = 'window.WAPI.genLinkDeviceCodeForPhoneNumber2("<#PHONE#>");';
 
   //FrmConsole_JS_VAR_getGroupInviteLink    = 'window.WAPI.getGroupInviteLink("<#GROUP_ID#>");'; deprecated
-  FrmConsole_JS_VAR_getGroupInviteLink      = 'window.WAPI.getInviteCode2("<#GROUP_ID#>");';
+  FrmConsole_JS_VAR_getGroupInviteLink      = 'window.WPP.groupInviteLinkNew("<#GROUP_ID#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");';
 
   FrmConsole_JS_VAR_sendGroupInviteMessageNew  = 'window.WPP.sendGroupInviteMessageNew("<#CHAT_ID#>","<#GROUP_ID#>","<#INVITE_CODE#>","<#SEUID#>");';
 
   //WPP.group.reject(12345645@g.us, 5554999999999@c.us);
-  FrmConsole_JS_VAR_GroupMembershipReject   = 'WPP.group.reject("<#GROUP_ID#>","<#CHAT_ID#>");';
-  FrmConsole_JS_VAR_GroupMembershipApprove  = 'WPP.group.approve("<#GROUP_ID#>","<#CHAT_ID#>");';
+  FrmConsole_JS_VAR_GroupMembershipReject   = 'window.WPP.groupMembershipRejectNew("<#GROUP_ID#>","<#CHAT_ID#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");';
+  FrmConsole_JS_VAR_GroupMembershipApprove  = 'window.WPP.groupMembershipApproveNew("<#GROUP_ID#>","<#CHAT_ID#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");';
 
   //FrmConsole_JS_VAR_removeGroupInviteLink   = 'window.WAPI.revokeGroupInviteLink("<#GROUP_ID#>");'; deprecated
-  FrmConsole_JS_VAR_removeGroupInviteLink   = 'WPP.group.revokeInviteCode("<#GROUP_ID#>");';
+  FrmConsole_JS_VAR_removeGroupInviteLink   = 'window.WPP.groupRevokeInviteNew("<#GROUP_ID#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");';
 
-  FrmConsole_JS_VAR_SetGroupDescription     = 'WPP.group.setDescription("<#GROUP_ID#>","<#Description#>");';
+  FrmConsole_JS_VAR_SetGroupDescription     = 'window.WPP.groupSetDescriptionNew("<#GROUP_ID#>","<#Description#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");';
+  //Marcelo 10/10/2026 - Gerenciamento de grupos (retorno via OnGet_GroupActionResponse / OnGet_GroupInfoResponse / OnGet_GroupMembershipRequestsResponse)
+  FrmConsole_JS_VAR_GroupEditAdminOnly      = 'window.WPP.groupSetPropertyNew("<#GROUP_ID#>","restrict",true,"SET_RESTRICT","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");';
+  FrmConsole_JS_VAR_GroupEditAll            = 'window.WPP.groupSetPropertyNew("<#GROUP_ID#>","restrict",false,"SET_RESTRICT","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");';
+  FrmConsole_JS_VAR_SetGroupSubject         = 'window.WPP.groupSetSubjectNew("<#GROUP_ID#>","<#Subject#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");';
+  FrmConsole_JS_VAR_GetGroupInfo            = 'window.WPP.getGroupInfoNew("<#GROUP_ID#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");';
+  FrmConsole_JS_VAR_GetGroupMembershipRequests = 'window.WPP.getGroupMembershipRequestsNew("<#GROUP_ID#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");';
+  FrmConsole_JS_VAR_GetGroupList            = 'window.WPP.getGroupListNew("<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");';
+  FrmConsole_JS_VAR_GetGroupMessageInfo     = 'window.WPP.getGroupMessageInfoNew("<#MSGKEY#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");';
 
-  FrmConsole_JS_VAR_SetGroupPicture         = 'WPP.group.setIcon("<#GROUP_ID#>","<#BASE_64#>");';
+  FrmConsole_JS_VAR_SetGroupPicture         = 'window.WPP.groupSetPictureNew("<#GROUP_ID#>","<#BASE_64#>","<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");';
 
 
   FrmConsole_JS_VAR_SaveContact             = 'WPP.contact.save("<#PHONE#>", "<#NAME_CONTACT#>", { surname: "<#SURNAME_CONTACT#>", syncAdressBook: true,});';
@@ -820,11 +845,11 @@ Const
   FrmConsole_JS_VAR_markIsUnread        = 'WPP.chat.markIsUnread("<#MSG_PHONE#>");';
 
   //Marcelo 07/04/2024
-  FrmConsole_JS_VAR_markIsComposingNew  = 'window.WPP.markIsComposingNew("<#MSG_PHONE#>", <#MSG_DURATION#>, "<SEUID>");';
-  FrmConsole_JS_VAR_markIsReadNew       = 'window.WPP.markIsReadNew("<#MSG_PHONE#>", "<SEUID>");';
-  FrmConsole_JS_VAR_markIsRecordingNew  = 'window.WPP.markIsRecordingNew("<#MSG_PHONE#>", <#MSG_DURATION#>, "<SEUID>");';
-  FrmConsole_JS_VAR_markIsUnreadNew     = 'window.WPP.markIsUnreadNew("<#MSG_PHONE#>", "<SEUID>");';
-  FrmConsole_JS_VAR_markPlayedNew     = 'window.WPP.markPlayedNew("<#MSG_PHONE#>", "<SEUID>");';
+  FrmConsole_JS_VAR_markIsComposingNew  = 'window.WPP.markIsComposingNew("<#MSG_PHONE#>", <#MSG_DURATION#>, "<#SEUID#>");';
+  FrmConsole_JS_VAR_markIsReadNew       = 'window.WPP.markIsReadNew("<#MSG_PHONE#>", "<#SEUID#>");';
+  FrmConsole_JS_VAR_markIsRecordingNew  = 'window.WPP.markIsRecordingNew("<#MSG_PHONE#>", <#MSG_DURATION#>, "<#SEUID#>");';
+  FrmConsole_JS_VAR_markIsUnreadNew     = 'window.WPP.markIsUnreadNew("<#MSG_PHONE#>", "<#SEUID#>");';
+  FrmConsole_JS_VAR_markPlayedNew     = 'window.WPP.markPlayedNew("<#MSG_PHONE#>", "<#SEUID#>");';
 
   //Adicionado Por Marcelo 14/03/2023
   FrmConsole_JS_VAR_markPlayed          = 'WPP.chat.markPlayed("<#MSG_PHONE#>");';
@@ -961,12 +986,15 @@ Const
   //Marcelo 29/06/2024
   FrmConsole_JS_VAR_sendOrderMessageNew    = 'window.WPP.sendOrderMessageNew("<#MSG_PHONE#>",[{<#MSG_ITEMS#>}], {<#MSG_OPTIONS#>},"<#MSG_SEUID#>", "<#MSG_SEUID2#>", "<#MSG_SEUID3#>", "<#MSG_SEUID4#>" );';
   FrmConsole_JS_VAR_sendChargeMessageNew   = 'window.WPP.sendChargeMessageNew("<#MSG_PHONE#>",[{<#MSG_ITEMS#>}], {<#MSG_OPTIONS#>},"<#MSG_SEUID#>", "<#MSG_SEUID2#>", "<#MSG_SEUID3#>", "<#MSG_SEUID4#>" );';
+  //Adicionado Por Marcelo 08/10/2026
+  FrmConsole_JS_VAR_sendCarouselMessageNew = 'window.WPP.sendCarouselMessageNew("<#MSG_PHONE#>", {<#MSG_OPTIONS#>}, "<#MSG_SEUID#>", "<#MSG_SEUID2#>", "<#MSG_SEUID3#>", "<#MSG_SEUID4#>" );';
+  FrmConsole_JS_VAR_sendBookingMessageNew  = 'window.WPP.sendBookingMessageNew("<#MSG_PHONE#>", {<#MSG_OPTIONS#>}, "<#MSG_SEUID#>", "<#MSG_SEUID2#>", "<#MSG_SEUID3#>", "<#MSG_SEUID4#>" );';
 
   FrmConsole_JS_VAR_editMessage         = 'WPP.chat.editMessage("<#MSG_UNIQUE_ID#>","<#MSG_NEW_MESSAGE#>",{<#MSG_OPTIONS#>} );';
 
   FrmConsole_JS_VAR_editMessageNew      = 'window.WPP.editMessageNew("<#MSG_UNIQUE_ID#>","<#MSG_NEW_MESSAGE#>",{<#MSG_OPTIONS#>},"<#MSG_SEUID#>", "<#MSG_SEUID2#>", "<#MSG_SEUID3#>", "<#MSG_SEUID4#>"  );';
 
-FrmConsole_JS_VAR_forwardMessage      =  'WPP.chat.forwardMessage("<#MSG_PHONE#>","<#MSG_UNIQUE_ID#>" );';
+  FrmConsole_JS_VAR_forwardMessage      =  'WPP.chat.forwardMessage("<#MSG_PHONE#>","<#MSG_UNIQUE_ID#>" );';
 
   //Marcelo 25/10/2022
   FrmConsole_JS_VAR_getList   = 'window.WAPI.list();';
@@ -979,11 +1007,11 @@ FrmConsole_JS_VAR_forwardMessage      =  'WPP.chat.forwardMessage("<#MSG_PHONE#>
   FrmConsole_JS_VAR_GetProductCatalog   = 'window.WAPI.ProductCatalog();';
 
   //Marcelo 14/06/2022
-  FrmConsole_JS_VAR_sendTextStatus   = 'WPP.status.sendTextStatus("<#MSG_CONTENT#>",{<#MSG_OPTIONS#>} );';
+  FrmConsole_JS_VAR_sendTextStatus   = 'window.WPP.sendTextStatusNew("<#MSG_CONTENT#>",{<#MSG_OPTIONS#>},"<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");'; //Marcelo 09/10/2026 - retorno via sendTextMessageEx / ErrorResponse
 
   //Marcelo 28/06/2022
-  FrmConsole_JS_VAR_sendImageStatus  = 'WPP.status.sendImageStatus("<#MSG_CONTENT#>",{<#MSG_OPTIONS#>} );';
-  FrmConsole_JS_VAR_sendVideoStatus  = 'WPP.status.sendVideoStatus("<#MSG_CONTENT#>",{<#MSG_OPTIONS#>} );';
+  FrmConsole_JS_VAR_sendImageStatus  = 'window.WPP.sendImageStatusNew("<#MSG_CONTENT#>",{<#MSG_OPTIONS#>},"<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");'; //Marcelo 09/10/2026 - retorno via sendTextMessageEx / ErrorResponse
+  FrmConsole_JS_VAR_sendVideoStatus  = 'window.WPP.sendVideoStatusNew("<#MSG_CONTENT#>",{<#MSG_OPTIONS#>},"<#MSG_SEUID#>","<#MSG_SEUID2#>","<#MSG_SEUID3#>","<#MSG_SEUID4#>");'; //Marcelo 09/10/2026 - retorno via sendTextMessageEx / ErrorResponse
   FrmConsole_JS_VAR_sendRawStatus    = 'WPP.status.sendRawStatus("<#MSG_CONTENT#>",{<#MSG_OPTIONS#>} );';
   FrmConsole_JS_VAR_getMyStatus      = 'getMyStatus();';
 
@@ -1018,7 +1046,7 @@ resourcestring
   MSG_ConfigCEF_ExceptBrowse           = '';
   MSG_ConfigCEF_ExceptConnetServ       = '';
   MSG_ConfigCEF_ExceptConsoleNaoPronto = '';
-  MSG_ConfigCEF_ExceptVersaoErrada     = '';
+  MSG_ConfigCEF_ExceptVersaoErrada     = 'Sua versão do CEF4 não é compatível, por favor, atualize suas biblioteca em https://github.com/salvadordf/CEF4Delphi' + slinebreak + 'Versão requerida: %s' + slinebreak + 'Versão identificada: %s';
   MSG_ConfigCEF_ExceptVersaoErrada_L2  = '';
   MSG_ExceptSetBatteryLow              = '';
   MSG_ExceptOnAlterQrCodeStyle         = '';
@@ -1029,7 +1057,7 @@ resourcestring
   MSG_ExceptNotAssignedOnGetQrCode     = '';
   Text_FrmClose_Caption                = '';
   Text_FrmClose_Label                  = '';
-  Text_FrmClose_WarningClose           = 'Fechar a aplica�ao?';
+  Text_FrmClose_WarningClose           = 'Fechar a aplicação?';
   Text_FrmQRCode_CaptionStart          = '';
   Text_FrmQRCode_CaptionSucess         = '';
   Text_FrmQRCode_OnCLose               = '';
@@ -1098,11 +1126,6 @@ resourcestring
   Text_FrmConfigNetWork_BntCancel        = '';
   Text_FrmConfigNetWork_QuestionSave     = '';
   Text_FrmConfigNetWork_PrtocolLbl       = '';
-
-var
-  gWPPSettingsIniFileName: string = '';
-
-function ResolveWPPSettingsIniFileName(const aDefaultDir: string): string;
 //  Text_FrmQRCode_OnCLose                 = '';
 //  Text_FrmQRCode_OnCLose                 = '';
 //  Text_FrmQRCode_OnCLose                 = '';
@@ -1214,9 +1237,19 @@ type
                    , Th_OnReceived_Message_Socket2=98 //Marcelo 19/05/2025
                    , Th_GetisLidMigrated=99 //Marcelo 25/11/2025
                    , Th_GetPnLidEntry=100 //Marcelo 25/11/2025
+                   , Th_GroupActionResponse=101 //Marcelo 10/10/2026
+                   , Th_GroupInfoResponse=102 //Marcelo 10/10/2026
+                   , Th_GroupMembershipRequestsResponse=103 //Marcelo 10/10/2026
+                   , Th_GroupListResponse=104 //Marcelo 10/10/2026
+                   , Th_GroupMessageInfoResponse=105 //Marcelo 13/10/2026
                    );
 
     TSecondCallback = procedure(SecondsRemaining: Integer) of object;
+
+var
+  gWPPSettingsIniFileName: string = '';
+
+function ResolveWPPSettingsIniFileName(const aDefaultDir: string): string;
 
     Function   VerificaCompatibilidadeVersao(PVersaoExterna:String; PversaoInterna:String):Boolean;
     Function   FrmConsole_JS_AlterVar(var PScript:String;  PNomeVar: String;  Const PValor:String):String;
@@ -1228,7 +1261,12 @@ type
 implementation
 
 uses
-  System.JSON, System.Classes, Vcl.Dialogs, Vcl.Forms, Winapi.Windows, uTWPPConnect.ConfigCEF;
+  {$IFDEF FPC}
+  Classes, Forms, uTWPPConnect.ConfigCEF
+  {$ELSE}
+  System.JSON, System.Classes, Vcl.Dialogs, Vcl.Forms, Winapi.Windows, uTWPPConnect.ConfigCEF
+  {$ENDIF};
+
 
 function ResolveWPPSettingsIniFileName(const aDefaultDir: string): string;
 var
@@ -1254,8 +1292,13 @@ Begin
     PVersaoExterna   := StringReplace(PVersaoExterna, ',', '.',    [rfReplaceAll, rfIgnoreCase]);
     PversaoInterna   := StringReplace(PversaoInterna, ',', '.',    [rfReplaceAll, rfIgnoreCase]);
 
+    {$IFDEF FPC}
+    ExtractStrings(['.'],[], PAnsiChar(AnsiString(PversaoInterna)), LVersionInt);
+    ExtractStrings(['.'],[], PAnsiChar(AnsiString(PVersaoExterna)), LVersionExt);
+    {$ELSE}
     ExtractStrings(['.'],[], PWideChar(PversaoInterna), LVersionInt);
     ExtractStrings(['.'],[], PWideChar(PVersaoExterna), LVersionExt);
+    {$ENDIF}
     for I := 0 to LVersionInt.count -1 do
       LInt := LInt + Copy(LVersionInt.Strings[i] + '00000000', 0, Versao0porCasas);
 
@@ -1288,6 +1331,8 @@ var
   LIni, LNow: Cardinal;
   Lpass: Integer;
   UltimoSegundo: Integer;
+  Elapsed: Cardinal;
+  Remaining: Integer;
 begin
   LIni := GetTickCount;
   Lpass := 0;
@@ -1312,8 +1357,8 @@ begin
 
     if (PtimeOut > 0) then
     begin
-      var Elapsed := LNow - LIni;
-      var Remaining := (PtimeOut - Elapsed) div 1000;
+      Elapsed := LNow - LIni;
+      Remaining := (PtimeOut - Integer(Elapsed)) div 1000;
 
       if Remaining < UltimoSegundo then
       begin
@@ -1388,7 +1433,7 @@ Begin
 End;
 
 function  StrToTypeHeader(PText: string): TTypeHeader;
-const LmaxCount = 100; //Marcelo 25/11/2025
+const LmaxCount = 105; //Marcelo 10/10/2026 (= ultimo valor de TTypeHeader; nao pode passar disso)
 var
   I: Integer;
   LNome: String;
@@ -1410,7 +1455,7 @@ Begin
 
   if Result  = Th_None Then
   Begin
-    //Acha por semelhan�a
+    //Acha por semelhança
     for I := 0 to LmaxCount do
     Begin
       LNome   := LowerCase(GetEnumName(TypeInfo(TTypeHeader), ord(TTypeHeader(i))));
@@ -1462,3 +1507,5 @@ end;
 
 
 end.
+
+

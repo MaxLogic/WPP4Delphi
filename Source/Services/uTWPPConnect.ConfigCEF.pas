@@ -43,6 +43,21 @@ unit uTWPPConnect.ConfigCEF;
 
 interface
 
+{$IFDEF FPC}
+uses
+  Classes,
+  SysUtils,
+  Rtti,
+  Windows,
+  Forms,
+  DateUtils,
+  IniFiles,
+  uCEFApplication, uCEFConstants,
+  uCEFChromium,
+
+  uTWPPConnect,
+  uTWPPConnect.constant, ExtCtrls, uTWPPConnect.Classes ;
+{$ELSE}
 uses
   System.Classes,
   System.SysUtils,
@@ -56,6 +71,7 @@ uses
 
   uTWPPConnect,
   uTWPPConnect.constant, Vcl.ExtCtrls, uTWPPConnect.Classes ;
+{$ENDIF}
 
 
 
@@ -96,6 +112,7 @@ type
     }
     function  TestaOk(POldValue, PNewValue: String): Boolean;
     procedure SetChromium(const Value: TChromium);
+    procedure SetIniFIle(const Value: TIniFile);
     Function  VersaoCEF4Aceita: Boolean;
 
   public
@@ -127,7 +144,7 @@ type
 
     Function   PathJsOverdue        : Boolean;
     property   PathJsUpdate         : TdateTime    Read FPathJsUpdate;
-    property   IniFIle              : TIniFile     Read FIniFIle              Write FIniFIle;
+    property   IniFIle              : TIniFile     Read FIniFIle              Write SetIniFIle;
     property   PathFrameworkDirPath : String       Read FPathFrameworkDirPath Write SetPathFrameworkDirPath;
     property   PathResourcesDirPath : String       Read FPathResourcesDirPath Write SetPathResourcesDirPath;
     property   PathLocalesDirPath   : String       Read FPathLocalesDirPath   Write SetPathLocalesDirPath;
@@ -154,7 +171,11 @@ var
 implementation
 
 uses
+  {$IFDEF FPC}
+  uCEFTypes, Dialogs, uTWPPConnect.Diversos;
+  {$ELSE}
   uCEFTypes, Vcl.Dialogs, uTWPPConnect.Diversos;
+  {$ENDIF}
 
 function IniDateTimeFormatSettings: TFormatSettings;
 begin
@@ -201,6 +222,17 @@ constructor TCEFConfig.Create;
 begin
   FInDesigner          := True;
   inherited;
+end;
+
+procedure TCEFConfig.SetIniFIle(const Value: TIniFile);
+begin
+  if FIniFIle = Value then
+     Exit;
+
+  if Assigned(FIniFIle) then
+     FreeAndNil(FIniFIle);
+
+  FIniFIle := Value;
 end;
 
 procedure TCEFConfig.SetChromium(const Value: TChromium);
@@ -371,14 +403,18 @@ begin
   if not DirectoryExists(LDir) then
     //raise Exception.Create(Format(MSG_ExceptPath, [LDir]));
     //Aurino 11/07/2022
+    {$IFDEF FPC}
+    deletefile(PAnsiChar(AnsiString(ResolveWPPSettingsIniFileName(ExtractFilePath(Application.ExeName))))) ;
+    {$ELSE}
     deletefile(pwidechar(ResolveWPPSettingsIniFileName(ExtractFilePath(Application.ExeName)))) ;
+    {$ENDIF}
   Result := true;
 end;
 
 
 function TCEFConfig.VersaoCEF4Aceita: Boolean;
 begin
-  if CEF_SUPPORTED_VERSION_MAJOR > VersaoMinima_CF4_Major then
+  if CEF_SUPPORTED_VERSION_MAJOR >= VersaoMinima_CF4_Major then
   Begin
     //Versao e maior!!! entaoo pode1
     Result := True;
@@ -458,11 +494,14 @@ begin
   if (Result) Then
   Begin
     //Ja iniciada!! cai fora!!
+    ctx.Free;
     Exit;
   end;
 
   FInDesigner          := False;
   FDirApp              := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName));
+  if Assigned(FIniFIle) then
+    FreeAndNil(FIniFIle);
   FIniFIle             := TIniFile.create(ResolveWPPSettingsIniFileName(FDirApp));
   LFormatSettings      := IniDateTimeFormatSettings;
   Lx                   := FIniFIle.ReadString('TWPPConnect Comp', 'Ultima interação', '01/01/1500 05:00:00');
@@ -484,13 +523,20 @@ begin
     LVReque   := IntToStr(VersaoMinima_CF4_Major)      + '.' + IntToStr(VersaoMinima_CF4_Minor)      + '.' + IntToStr(VersaoMinima_CF4_Release);
     LVerIdent := IntToStr(CEF_SUPPORTED_VERSION_MAJOR) + '.' + IntToStr(CEF_SUPPORTED_VERSION_MINOR) + '.' + IntToStr(CEF_SUPPORTED_VERSION_BUILD);
     {$IFNDEF STANDALONE}
+    {$IFDEF FPC}
+    Application.MessageBox(PAnsiChar(AnsiString(Format(MSG_ConfigCEF_ExceptVersaoErrada, [LVReque, LVerIdent]))),
+                           PAnsiChar(AnsiString(Application.Title)), MB_ICONERROR + mb_ok
+                          );
+    {$ELSE}
     Application.MessageBox(PWideChar(Format(MSG_ConfigCEF_ExceptVersaoErrada, [LVReque, LVerIdent])),
                            PWideChar(Application.Title), MB_ICONERROR + mb_ok
                           );
+    {$ENDIF}
     {$ELSE}
     raise Exception.Create(Format(MSG_ConfigCEF_ExceptVersaoErrada, [LVReque, LVerIdent]));
     {$ENDIF}
     result := False;
+    ctx.Free;
     Exit;
   End;
 
@@ -579,7 +625,11 @@ begin
     Result  := (Self.status = asInitialized);
     if not Result then
     {$IFNDEF STANDALONE}
+       {$IFDEF FPC}
+       Application.MessageBox(PAnsiChar(AnsiString(MSG_ConfigCEF_ExceptConnection)), PAnsiChar(AnsiString(Application.Title)), MB_ICONERROR + mb_ok);
+       {$ELSE}
        Application.MessageBox(PWideChar(MSG_ConfigCEF_ExceptConnection), PWideChar(Application.Title), MB_ICONERROR + mb_ok);
+       {$ENDIF}
     {$ELSE}
       raise exception.Create(MSG_ConfigCEF_ExceptConnection);
     {$ENDIF}

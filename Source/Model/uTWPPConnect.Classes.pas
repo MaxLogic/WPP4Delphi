@@ -33,6 +33,12 @@
 unit uTWPPConnect.Classes;
 interface
 {$I TWPPConnectDiretiva.inc}
+{$IFDEF FPC}
+uses Generics.Collections, uTWPPConnect.JsonCompat, fpjson, uTWPPConnect.FrmQRCode, Graphics,
+  Classes, SysUtils, uTWPPConnect.Constant, IdHTTP, ExtCtrls,
+  IdBaseComponent, IdComponent, IdTCPConnection, IdTCPClient,
+  IdSSLOpenSSL, ShellApi, Activex, fphttpclient;
+{$ELSE}
 uses Generics.Collections, Rest.Json, uTWPPConnect.FrmQRCode, Vcl.Graphics, System.IOUtils,
   System.Classes, uTWPPConnect.Constant, IdHTTP, Vcl.ExtCtrls,
   {$IFDEF DELPHI25_UP}
@@ -40,6 +46,7 @@ uses Generics.Collections, Rest.Json, uTWPPConnect.FrmQRCode, Vcl.Graphics, Syst
   {$ENDIF}
   IdBaseComponent, IdComponent, IdTCPConnection, IdTCPClient, Vcl.Imaging.jpeg,
   IdSSLOpenSSL, UrlMon, ShellApi, Activex, REST.Types, REST.Client;
+{$ENDIF}
 type
   TQrCodeRet   = (TQR_Http, TQR_Img, TQR_Data);
   TQrCodeRets  = set of TQrCodeRet;
@@ -74,7 +81,10 @@ type
     Property    ShowException: Boolean    Read FShowException  Write FShowException;
   end;
 
+  {$IFNDEF FPC}
   //Dejorgenes - Adicionado classe REST para fazer download do js.abr - 05/08/2024
+  //Nao portado para FPC: caminho alternativo de download (DT_Rest); o caminho
+  //padrao DT_Indy (TUrlIndy) continua disponivel nos dois compiladores.
   TUrlREST = class(TRESTRequest)
   private
     FTimeOut       : Integer;
@@ -90,6 +100,7 @@ type
     property    TimeOut: Integer         read FTimeOut       write FTimeOut;
     property    ShowException: Boolean   read FShowException write FShowException;
   end;
+  {$ENDIF}
 
   TClassPadrao = class
   private
@@ -563,6 +574,9 @@ type
   public
      constructor Create(pAJsonString: string);
      destructor  Destroy;       override;
+  published
+     //published (nao apenas public) para o RTTI do FPC conseguir enumerar estas
+     //propriedades e popula-las via uTWPPConnect.JsonCompat - nao muda o comportamento no Delphi.
      property &type                 : String        Read Ftype                        Write Ftype;
      property mediaStage            : String        Read FmediaStage                  Write FmediaStage;
      property size                  : Extended      Read Fsize                        Write Fsize;
@@ -735,12 +749,14 @@ type
    Fvalid : boolean;
    Flid: String;
     Fstatus: String;
+   FfromJid: String; //Add Marcelo 21/09/2026
  public
    property NumberOriginal  : String read FNumberOriginal  write FNumberOriginal; //Add Marcelo 14/12/2022
    property id : String read Fid write Fid;
    property lid : String read Flid write Flid;
    property status : String read Fstatus write Fstatus;
    property valid : boolean  read Fvalid write Fvalid;
+   property fromJid : String read FfromJid write FfromJid; //Add Marcelo 21/09/2026
  end;
 
  TReturngetLastSeen = class(TClassPadrao) //Marcelo 06/01/2023 Alterado
@@ -1270,6 +1286,7 @@ type
   public
     destructor Destroy; override;
     constructor Create(pAJsonString: string);
+  published
     property profilePicThumbObj: TProfilePicThumbObjClass read FProfilePicThumbObj write FProfilePicThumbObj;
     property formattedName:   String         read FFormattedName    write FFormattedName;
     property id:              String         read FId               write FId;
@@ -1839,6 +1856,9 @@ type
     constructor Create(pAJsonString: string);
     destructor  Destroy;       override;
     class function FromJsonString(AJsonString: string): TMessagesClass;
+  published
+    //published (nao apenas public) para o RTTI do FPC conseguir enumerar estas
+    //propriedades e popula-las via uTWPPConnect.JsonCompat - nao muda o comportamento no Delphi.
     property ack        : Extended            read FAck                write FAck;
     property body       : String              read FBody               write FBody;
     property broadcast  : Boolean             read FBroadcast          write FBroadcast;
@@ -2573,10 +2593,17 @@ private
   FGroupId: String;
   FGroup_participant_changed: String;
   FParticipants: TArray<String>;
+  FOperation: String;
+  FAuthorPhone: String;
+  FParticipantsPhone: TArray<String>;
 public
+  //action: add | remove | promote | demote | join (entrou por convite) | leave (saiu); operation = acao original do WhatsApp
   property action: String read FAction write FAction;
-  property author: String read FAuthor write FAuthor;
+  property operation: String read FOperation write FOperation;
+  property author: String read FAuthor write FAuthor;                    //quem fez a acao (LID ou @c.us)
+  property authorPhone: String read FAuthorPhone write FAuthorPhone;     //@c.us de quem agiu (vazio quando nao resolvido)
   property authorPushName: String read FAuthorPushName write FAuthorPushName;
+  property participantsPhone: TArray<String> read FParticipantsPhone write FParticipantsPhone; //mesma ordem de participants; '' quando nao resolvido
   property groupId: String read FGroupId write FGroupId;
   property group_participant_changed: String read FGroup_participant_changed write FGroup_participant_changed;
   property participants: TArray<String> read FParticipants write FParticipants;
@@ -2685,11 +2712,13 @@ end;
     FFromMe: Boolean;
     FId: String;
     FRemote: String;
+    FParticipant: String;
   public
     property _serialized: String read F_serialized write F_serialized;
     property fromMe: Boolean read FFromMe write FFromMe;
     property id: String read FId write FId;
     property remote: String read FRemote write FRemote;
+    property participant: String read FParticipant write FParticipant;   //Marcelo 13/10/2026 - autor da mensagem em grupos/status
     //function ToJsonString: string;
     //class function FromJsonString(AJsonString: string): TMsgIdClass;
   end;
@@ -2759,10 +2788,13 @@ private
   FReactionText: String;
   FRead: Boolean;
   FSender: String;
+  FSenderPhone: String;
   FTimestamp: Extended;
 public
   property id: TIdClass read FId write FId;
+  //msgId = chave da mensagem reagida (remote = grupo/chat, participant = autor da mensagem reagida, _serialized = id completo)
   property msgId: TMsgIdClass read FMsgId write FMsgId;
+  property senderPhone: String read FSenderPhone write FSenderPhone;   //@c.us de quem reagiu (vazio quando so o LID e conhecido)
   property orphan: Extended read FOrphan write FOrphan;
   property reactionText: String read FReactionText write FReactionText;
   property read: Boolean read FRead write FRead;
@@ -4005,6 +4037,264 @@ public
   property widContacts: String read FwidContacts write FwidContacts;
 end;
 
+//Marcelo 10/10/2026 - Gerenciamento de grupos com retorno correlacionavel (SeuID)
+//Retorno de createGroup, GroupAddParticipant, GroupRemoveParticipant, GroupPromote/DemoteParticipant, SetGroupDescription, GroupSetSubject,
+//GroupMsgAdminOnly/All, GroupEditAdminOnly/All, GroupRemoveInviteLink, GroupLeave, GroupMembershipApprove/Reject e falhas das consultas
+//  statusCode: 0 sucesso | 303 erro do WA-JS/WhatsApp (ErrorCode) | 304 ADD_PARTICIPANT recusado | 305 parametro invalido (validado no componente, nada foi enviado ao navegador)
+//  Lista completa de Action, statusCode e ErrorCode: Docs/GestaoDeGrupos.md
+TGroupActionResponseClass = class(TClassPadrao)
+private
+  FSeuid: String;
+  FSeuid2: String;
+  FSeuid3: String;
+  FSeuid4: String;
+  FAction: String;
+  FGroupId: String;
+  FSuccess: Boolean;
+  FstatusCode: Integer;
+  FErrorCode: String;
+  FError: String;
+  FData: String;
+public
+  property Seuid: String read FSeuid write FSeuid;
+  property Seuid2: String read FSeuid2 write FSeuid2;
+  property Seuid3: String read FSeuid3 write FSeuid3;
+  property Seuid4: String read FSeuid4 write FSeuid4;
+  property Action: String read FAction write FAction;          //CREATE, ADD_PARTICIPANT, REMOVE_PARTICIPANT, ...
+  property GroupId: String read FGroupId write FGroupId;       //no CREATE traz o jid do grupo criado
+  property Success: Boolean read FSuccess write FSuccess;
+  property statusCode: Integer read FstatusCode write FstatusCode;
+  property ErrorCode: String read FErrorCode write FErrorCode; //codigo do WA-JS (ex.: group_you_are_not_admin)
+  property Error: String read FError write FError;
+  property Data: String read FData write FData;               //JSON do retorno do WA-JS (ver js.abr)
+end;
+
+TGroupParticipantClass = class(TClassPadrao)
+private
+  FId: String;
+  FJid: String;
+  FLid: String;
+  FPhone: String;
+  FPushname: String;
+  FName: String;
+  FIsAdmin: Boolean;
+  FIsSuperAdmin: Boolean;
+public
+  property Id: String read FId write FId;               //id original (@lid ou @c.us)
+  property Jid: String read FJid write FJid;            //@c.us (vazio quando so o LID e conhecido)
+  property Lid: String read FLid write FLid;
+  property Phone: String read FPhone write FPhone;      //somente digitos (vazio quando so o LID e conhecido)
+  property Pushname: String read FPushname write FPushname;
+  property Name: String read FName write FName;
+  property IsAdmin: Boolean read FIsAdmin write FIsAdmin;
+  property IsSuperAdmin: Boolean read FIsSuperAdmin write FIsSuperAdmin; //criador do grupo
+end;
+
+//Metadados do grupo (GetGroupInfo)
+TGroupInfoClass = class(TClassPadrao)
+private
+  FSeuid: String;
+  FSeuid2: String;
+  FSeuid3: String;
+  FSeuid4: String;
+  FGroupId: String;
+  FSubject: String;
+  FDescription: String;
+  FOwner: String;
+  FOwnerPhone: String;
+  FCreation: Extended;
+  FAnnounce: Boolean;
+  FRestrict: Boolean;
+  FMemberAddMode: String;
+  FMembershipApprovalMode: String;
+  FIsLidAddressingMode: Boolean;
+  FEphemeralDuration: Extended;
+  FSize: Integer;
+  FInviteCode: String;
+  FInviteLink: String;
+  FParticipants: TArray<TGroupParticipantClass>;
+public
+  destructor Destroy; override;
+  property Seuid: String read FSeuid write FSeuid;
+  property Seuid2: String read FSeuid2 write FSeuid2;
+  property Seuid3: String read FSeuid3 write FSeuid3;
+  property Seuid4: String read FSeuid4 write FSeuid4;
+  property GroupId: String read FGroupId write FGroupId;
+  property Subject: String read FSubject write FSubject;
+  property Description: String read FDescription write FDescription;
+  property Owner: String read FOwner write FOwner;
+  property OwnerPhone: String read FOwnerPhone write FOwnerPhone;
+  property Creation: Extended read FCreation write FCreation;                 //epoch em segundos
+  property Announce: Boolean read FAnnounce write FAnnounce;                  //somente admins enviam mensagens
+  property Restrict: Boolean read FRestrict write FRestrict;                  //somente admins editam os dados do grupo
+  property MemberAddMode: String read FMemberAddMode write FMemberAddMode;    //admin_add | all_member_add
+  property MembershipApprovalMode: String read FMembershipApprovalMode write FMembershipApprovalMode; //on | off | vazio (WhatsApp Web nao expos)
+  property IsLidAddressingMode: Boolean read FIsLidAddressingMode write FIsLidAddressingMode;
+  property EphemeralDuration: Extended read FEphemeralDuration write FEphemeralDuration;
+  property Size: Integer read FSize write FSize;
+  property InviteCode: String read FInviteCode write FInviteCode;             //vazio se nao for admin
+  property InviteLink: String read FInviteLink write FInviteLink;
+  property Participants: TArray<TGroupParticipantClass> read FParticipants write FParticipants;
+end;
+
+TGroupMembershipRequestClass = class(TClassPadrao)
+private
+  FId: String;
+  FJid: String;
+  FLid: String;
+  FPhone: String;
+  FPushname: String;
+  FName: String;
+  FAddedBy: String;
+  FRequestMethod: String;
+  FT: Extended;
+public
+  property Id: String read FId write FId;
+  property Jid: String read FJid write FJid;
+  property Lid: String read FLid write FLid;
+  property Phone: String read FPhone write FPhone;
+  property Pushname: String read FPushname write FPushname;
+  property Name: String read FName write FName;
+  property AddedBy: String read FAddedBy write FAddedBy;
+  property RequestMethod: String read FRequestMethod write FRequestMethod;
+  property T: Extended read FT write FT;                                      //epoch em segundos
+end;
+
+//Pedidos de entrada pendentes (GetGroupMembershipRequests)
+TGroupMembershipRequestsClass = class(TClassPadrao)
+private
+  FSeuid: String;
+  FSeuid2: String;
+  FSeuid3: String;
+  FSeuid4: String;
+  FGroupId: String;
+  FRequests: TArray<TGroupMembershipRequestClass>;
+public
+  destructor Destroy; override;
+  property Seuid: String read FSeuid write FSeuid;
+  property Seuid2: String read FSeuid2 write FSeuid2;
+  property Seuid3: String read FSeuid3 write FSeuid3;
+  property Seuid4: String read FSeuid4 write FSeuid4;
+  property GroupId: String read FGroupId write FGroupId;
+  property Requests: TArray<TGroupMembershipRequestClass> read FRequests write FRequests;
+end;
+
+//Lista de grupos (GetGroupList)
+//Marcelo 13/10/2026 - Entrega/leitura POR PARTICIPANTE de mensagem enviada a grupo (evento OnGroupMessageAck)
+TGroupMessageAckClass = class
+private
+  FGroupId: String;
+  FMessageShortId: String;
+  FMessageKey: String;
+  FMessageId: String;
+  FSender: String;
+  FSenderPhone: String;
+  FAck: Integer;
+  FAckAt: Int64;
+public
+  property GroupId: String read FGroupId write FGroupId;                   //jid do grupo (@g.us)
+  property MessageShortId: String read FMessageShortId write FMessageShortId; //so o <ID> da mensagem
+  property MessageKey: String read FMessageKey write FMessageKey;          //true_<grupo>_<ID> (sem remetente)
+  property MessageId: String read FMessageId write FMessageId;             //true_<grupo>_<ID>_<remetente>; vazio se nao encontrado no WhatsApp Web
+  property Sender: String read FSender write FSender;                      //quem recebeu/leu (@lid ou @c.us)
+  property SenderPhone: String read FSenderPhone write FSenderPhone;       //@c.us (vazio quando so o LID e conhecido)
+  property Ack: Integer read FAck write FAck;                              //2 entregue, 3 lido, 4 reproduzido
+  property AckAt: Int64 read FAckAt write FAckAt;                          //epoch (s) em que o evento chegou
+end;
+
+//Resposta de GetGroupMessageInfo (OnGet_GroupMessageInfoResponse)
+TGroupMessageParticipantClass = class(TClassPadrao)
+private
+  FId: String;
+  FJid: String;
+  FLid: String;
+  FPhone: String;
+  FPushname: String;
+  FName: String;
+  FDeliveredAt: Extended;
+  FReadAt: Extended;
+  FPlayedAt: Extended;
+public
+  property Id: String read FId write FId;
+  property Jid: String read FJid write FJid;
+  property Lid: String read FLid write FLid;
+  property Phone: String read FPhone write FPhone;
+  property Pushname: String read FPushname write FPushname;
+  property Name: String read FName write FName;
+  property DeliveredAt: Extended read FDeliveredAt write FDeliveredAt;   //epoch (s); 0 = ainda nao
+  property ReadAt: Extended read FReadAt write FReadAt;
+  property PlayedAt: Extended read FPlayedAt write FPlayedAt;
+end;
+
+TGroupMessageInfoClass = class(TClassPadrao)
+private
+  FSeuid: String;
+  FSeuid2: String;
+  FSeuid3: String;
+  FSeuid4: String;
+  FGroupId: String;
+  FMessageId: String;
+  FAck: Extended;
+  FFromMe: Boolean;
+  FDeliveryRemaining: Extended;
+  FReadRemaining: Extended;
+  FPlayedRemaining: Extended;
+  FParticipants: TArray<TGroupMessageParticipantClass>;
+public
+  destructor Destroy; override;
+  property Seuid: String read FSeuid write FSeuid;
+  property Seuid2: String read FSeuid2 write FSeuid2;
+  property Seuid3: String read FSeuid3 write FSeuid3;
+  property Seuid4: String read FSeuid4 write FSeuid4;
+  property GroupId: String read FGroupId write FGroupId;
+  property MessageId: String read FMessageId write FMessageId;
+  property Ack: Extended read FAck write FAck;                            //ack agregado da mensagem
+  property FromMe: Boolean read FFromMe write FFromMe;
+  property DeliveryRemaining: Extended read FDeliveryRemaining write FDeliveryRemaining; //participantes que ainda nao receberam
+  property ReadRemaining: Extended read FReadRemaining write FReadRemaining;
+  property PlayedRemaining: Extended read FPlayedRemaining write FPlayedRemaining;
+  property Participants: TArray<TGroupMessageParticipantClass> read FParticipants write FParticipants;
+end;
+
+TGroupListItemClass = class(TClassPadrao)
+private
+  FId: String;
+  FName: String;
+  FSubject: String;
+  FOwner: String;
+  FCreation: Extended;
+  FSize: Integer;
+  FAnnounce: Boolean;
+  FRestrict: Boolean;
+  FIsAdmin: Boolean;
+public
+  property Id: String read FId write FId;                   //jid do grupo (@g.us)
+  property Name: String read FName write FName;
+  property Subject: String read FSubject write FSubject;
+  property Owner: String read FOwner write FOwner;
+  property Creation: Extended read FCreation write FCreation; //epoch em segundos (0 se o metadata nao foi carregado)
+  property Size: Integer read FSize write FSize;              //0 se o metadata nao foi carregado
+  property Announce: Boolean read FAnnounce write FAnnounce;
+  property Restrict: Boolean read FRestrict write FRestrict;
+  property IsAdmin: Boolean read FIsAdmin write FIsAdmin;     //se a conta conectada e admin do grupo
+end;
+
+TGroupListClass = class(TClassPadrao)
+private
+  FSeuid: String;
+  FSeuid2: String;
+  FSeuid3: String;
+  FSeuid4: String;
+  FGroups: TArray<TGroupListItemClass>;
+public
+  destructor Destroy; override;
+  property Seuid: String read FSeuid write FSeuid;
+  property Seuid2: String read FSeuid2 write FSeuid2;
+  property Seuid3: String read FSeuid3 write FSeuid3;
+  property Seuid4: String read FSeuid4 write FSeuid4;
+  property Groups: TArray<TGroupListItemClass> read FGroups write FGroups;
+end;
+
 TdeleteMessageNewResponseClass = class(TClassPadrao)
 private
   FJsonMessage: String;
@@ -4074,12 +4364,21 @@ private
   FChat: String;
   FIds: TArray<TIdsClass>;
   FSender: String;
+  FSenderPhone: String;
+  FAckAt: Extended;
+  FMessageId: String;
+  FMessageIds: TArray<String>;
 
 public
   property ack: Extended read FAck write FAck;
   property chat: String read FChat write FChat;
   property ids: TArray<TIdsClass> read FIds write FIds;
   property sender: String read FSender write FSender;
+  //Marcelo 13/10/2026 - somente em mensagens de grupo
+  property senderPhone: String read FSenderPhone write FSenderPhone;   //@c.us de quem recebeu/leu (vazio quando so o LID e conhecido)
+  property ackAt: Extended read FAckAt write FAckAt;                   //epoch (s) em que o evento chegou (o WA-JS nao informa o horario do recibo)
+  property messageId: String read FMessageId write FMessageId;         //id completo true_<grupo>_<ID>_<remetente> da primeira mensagem; vazio se nao encontrado
+  property messageIds: TArray<String> read FMessageIds write FMessageIds; //idem para cada item de ids[] (mesma ordem)
 end;
 
 TAck_changeClass = class(TClassPadrao)
@@ -4206,6 +4505,49 @@ Public
   destructor  Destroy;       override;
   function ToJsonString: string;
   class function FromJsonString(AJsonString: string): TResponsesendTextMessage;
+end;
+
+//Marcelo 09/10/2026 - Acompanhamento de Status publicado pelo componente (entrega / visualizacao / reacao)
+TStatusTrackClass = class
+private
+  FStatusKey: String;
+  FStatusID: String;
+  FSeuID: String;
+  FSeuID2: String;
+  FSeuID3: String;
+  FSeuID4: String;
+  FSentAt: TDateTime;
+  FServerReceived: Boolean;
+  FDelivered: TStringList;
+  FViewed: TStringList;
+  FReactions: TStringList;
+  function GetDeliveredCount: Integer;
+  function GetViewedCount: Integer;
+  function GetReactionCount: Integer;
+public
+  constructor Create(const AStatusKey, AStatusID, ASeuID, ASeuID2, ASeuID3, ASeuID4: String);
+  destructor  Destroy; override;
+  //Extrai a chave curta do Status (ex.: 00CE7E2A4BB2D31FC7FACB2BD1A4B22E) do id retornado na publicacao
+  //(true_status@broadcast_<CHAVE>_<participante>) - mesma chave que vem em ids[0].id do ack e em msgId.id da reacao
+  class function ExtractStatusKey(const AMessageID: String): String;
+  //Retorna True quando o ack trouxe informacao nova (1=servidor, 2=entregue, 3=visto)
+  function RegisterAck(const ASender: String; AAck: Integer): Boolean;
+  //Retorna True quando a reacao e nova/alterada/removida (AReaction vazio remove)
+  function RegisterReaction(const ASender, AReaction: String): Boolean;
+  property StatusKey: String read FStatusKey;
+  property StatusID: String read FStatusID;
+  property SeuID: String read FSeuID;
+  property SeuID2: String read FSeuID2;
+  property SeuID3: String read FSeuID3;
+  property SeuID4: String read FSeuID4;
+  property SentAt: TDateTime read FSentAt;
+  property ServerReceived: Boolean read FServerReceived;
+  property Delivered: TStringList read FDelivered;   //contatos com ack >= 2
+  property Viewed: TStringList read FViewed;         //contatos com ack >= 3
+  property Reactions: TStringList read FReactions;   //Name=contato, Value=reacao
+  property DeliveredCount: Integer read GetDeliveredCount;
+  property ViewedCount: Integer read GetViewedCount;
+  property ReactionCount: Integer read GetReactionCount;
 end;
 
 TRetornoAllContacts = class(TClassPadraoList<TContactClass>)
@@ -4397,42 +4739,90 @@ Procedure ClearLastQrcodeCtr;
 
 implementation
 
+{$IFDEF FPC}
+uses
+  jsonparser, base64, Dialogs,
+  uTWPPConnect.ConfigCEF, Forms, Windows,
+  uTWPPConnect.Diversos ;
+{$ELSE}
 uses
   System.JSON, System.SysUtils, Vcl.Dialogs, System.NetEncoding,
   Vcl.Imaging.pngimage, uTWPPConnect.ConfigCEF, Vcl.Forms, Winapi.Windows,
   uTWPPConnect.Diversos ;
+{$ENDIF}
 var
   FUltimoQrCode: String;
 //Marcelo 18/06/2022
 function TIncomingiCall.ToJsonString: string;
 begin
-  result := TJson.ObjectToJsonString(self);
+  {$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}
 end;
 
 //Marcelo 18/06/2022
 constructor TIncomingiCall.Create(pAJsonString: string);
+{$IFDEF FPC}
+var
+  vJson : string;
+  lAJsonObj: TJSONData;
+  lAJsonObj2: TJSONData;
+  lAJsonObj3: TJSONData;
+  lAJsonObjB: TJSONData;
+begin
+  vJson := pAJsonString;
+  lAJsonObjB := nil;
+  lAJsonObj := ParseJSONCompat(pAJsonString);
+  try
+    if Assigned(lAJsonObj) and (lAJsonObj.JSONType = jtObject) then
+    begin
+      lAJsonObj2 := TJSONObject(lAJsonObj).Find('result');
+      if Assigned(lAJsonObj2) then
+      begin
+        vJson := lAJsonObj2.AsJSON;
+        lAJsonObjB := ParseJSONCompat(vJson);
+        if Assigned(lAJsonObjB) and (lAJsonObjB.JSONType = jtObject) then
+        begin
+          lAJsonObj3 := TJSONObject(lAJsonObjB).Find('result');
+          if Assigned(lAJsonObj3) then
+          begin
+            vJson := Copy(lAJsonObj3.AsJSON, 2, Length(lAJsonObj3.AsJSON) - 2);
+            inherited Create(vJson);
+          end;
+        end;
+      end;
+    end;
+  finally
+    FreeAndNil(lAJsonObj);
+    FreeAndNil(lAJsonObjB);
+  end;
+end;
+{$ELSE}
 var
   vJson : string;
   lAJsonObj: TJSONValue;
   lAJsonObj2: TJSONValue;
   lAJsonObj3: TJSONValue;
-  myarr: TJSONArray;
+  lAJsonObjB: TJSONValue;
 begin
   vJson := pAJsonString;
+  lAJsonObjB := nil;
   lAJsonObj := TJSONObject.ParseJSONValue(pAJsonString) as TJSONObject;
-
-  if lAJsonObj.TryGetValue('result', lAJsonObj2) then
-  begin
-    vJson := lAJsonObj2.ToJSON;
-    lAJsonObj := TJSONObject.ParseJSONValue(vJson) as TJSONObject;
-    if lAJsonObj.TryGetValue('result', lAJsonObj3) then
+  try
+    if lAJsonObj.TryGetValue('result', lAJsonObj2) then
     begin
-      vJson := Copy(lAJsonObj3.ToJSON,2,Length(lAJsonObj3.ToJSON)-2);
-      inherited Create(vJson);
+      vJson := lAJsonObj2.ToJSON;
+      lAJsonObjB := TJSONObject.ParseJSONValue(vJson) as TJSONObject;
+      if lAJsonObjB.TryGetValue('result', lAJsonObj3) then
+      begin
+        vJson := Copy(lAJsonObj3.ToJSON,2,Length(lAJsonObj3.ToJSON)-2);
+        inherited Create(vJson);
+      end;
     end;
+  finally
+    FreeAndNil(lAJsonObj);
+    FreeAndNil(lAJsonObjB);
   end;
-
 end;
+{$ENDIF}
 
 //Marcelo 18/06/2022
 destructor TIncomingiCall.Destroy;
@@ -4442,12 +4832,33 @@ end;
 
 class function TIncomingiCall.FromJsonString(AJsonString: string): TIncomingiCall;
 begin
-  result := TJson.JsonToObject<TIncomingiCall>(AJsonString)
+  {$IFDEF FPC}result := TIncomingiCall(CreateFromJsonCompat(TIncomingiCall, AJsonString)){$ELSE}result := TJson.JsonToObject<TIncomingiCall>(AJsonString){$ENDIF}
 end;
 Procedure ClearLastQrcodeCtr;
 Begin
   FUltimoQrCode:= '';
 End;
+{$IFDEF FPC}
+//Substitui TFile.AppendAllText (System.IOUtils, nao existe no FPC)
+Procedure AppendTextCompat(const AFileName, AText: string);
+var
+  F: TextFile;
+begin
+  AssignFile(F, AFileName);
+  try
+    if FileExists(AFileName) then
+      Append(F)
+    else
+      Rewrite(F);
+    try
+      Write(F, AText);
+    finally
+      CloseFile(F);
+    end;
+  except
+  end;
+end;
+{$ENDIF}
 Procedure LogAdd(Pvalor:WideString; PCab:String);
 Var
   LTmp, LName:String;
@@ -4464,9 +4875,15 @@ Begin
          if PCab= 'CONSOLE'  then
             LTmp:= '[' + FormatDateTime('dd/mm/yy hh:nn:ss', now) + ' - ' + PCab + ']  ' + slinebreak Else
             LTmp:= '[' + FormatDateTime('dd/mm/yy hh:nn:ss', now) + ' - ' + PCab + ']  ' + slinebreak;
+      {$IFDEF FPC}
+      if PCab= 'CONSOLE'  then
+        AppendTextCompat(LName, slinebreak);
+      AppendTextCompat(LName, slinebreak + LTmp + Pvalor);
+      {$ELSE}
       if PCab= 'CONSOLE'  then
         TFile.AppendAllText(LName, slinebreak, TEncoding.ASCII);
       TFile.AppendAllText(LName, slinebreak + LTmp + Pvalor, TEncoding.ASCII);
+      {$ENDIF}
     End;
   Except
   end;
@@ -4487,9 +4904,15 @@ Begin
          if PCab= 'CONSOLE'  then
             LTmp:= '[' + FormatDateTime('dd/mm/yy hh:nn:ss', now) + ' - ' + PCab + ']  ' + slinebreak Else
             LTmp:= '[' + FormatDateTime('dd/mm/yy hh:nn:ss', now) + ' - ' + PCab + ']  ' + slinebreak;
+      {$IFDEF FPC}
+      if PCab= 'CONSOLE'  then
+        AppendTextCompat(LName, slinebreak);
+      AppendTextCompat(LName, slinebreak + LTmp + Pvalor);
+      {$ELSE}
       if PCab= 'CONSOLE'  then
         TFile.AppendAllText(LName, slinebreak, TEncoding.ASCII);
       TFile.AppendAllText(LName, slinebreak + LTmp + Pvalor, TEncoding.ASCII);
+      {$ENDIF}
     End;
   Except
   end;
@@ -4510,7 +4933,7 @@ begin
   inherited Create(pAJsonString);
 end;
 function TResultQRCodeClass.CreateImage: Boolean;
-{$IFNDEF VER330}
+{$IF NOT DEFINED(VER330) AND NOT DEFINED(FPC)}
 var
     PNG: TpngImage;
 {$ENDIF}
@@ -4520,10 +4943,11 @@ begin
     if FAQrCodeImageStream.Size <= 0 Then
        Exit;
     FreeAndNil(FAQrCodeImage);
-    FAQrCodeImage  := TPicture.Create;       
+    FAQrCodeImage  := TPicture.Create;
     FAQrCodeImageStream.Position := 0;
-    
-    {$IFDEF VER330}
+
+    {$IF DEFINED(VER330) OR DEFINED(FPC)}
+      //No FPC/LCL o TPicture.LoadFromStream ja decodifica PNG nativamente.
       FAQrCodeImage.LoadFromStream(FAQrCodeImageStream);
    {$ELSE}
       PNG := TPngImage.Create;
@@ -4531,7 +4955,7 @@ begin
         Png.LoadFromStream(FAQrCodeImageStream);
         FAQrCodeImage.Graphic := PNG;
       finally
-        PNG.DisposeOf;
+        {$IFDEF FPC}PNG.Free;{$ELSE}PNG.DisposeOf;{$ENDIF}
       end;
    {$ENDIF}
     result := True;
@@ -4541,13 +4965,16 @@ end;
 destructor TResultQRCodeClass.Destroy;
 begin
   FreeAndNil(FAQrCodeImage);
-  FAQrCodeImageStream.DisposeOf;
+  {$IFDEF FPC}FAQrCodeImageStream.Free;{$ELSE}FAQrCodeImageStream.DisposeOf;{$ENDIF}
   inherited;
 end;
 procedure TResultQRCodeClass.ProcessQRCodeImage;
 var
   LMem: TMemoryStream;
   LConvert: TStringList;
+  {$IFDEF FPC}
+  LB64Decoder: TBase64DecodingStream;
+  {$ENDIF}
 begin
   //Se a imagem for a mesma!! nao precisa fazer nada!
   if FUltimoQrCode = AQrCode then
@@ -4556,7 +4983,7 @@ begin
     Exit;
   End;
   FUltimoQrCode  := AQrCode;
-  FAQrCodeImageStream.DisposeOf;
+  {$IFDEF FPC}FAQrCodeImageStream.Free;{$ELSE}FAQrCodeImageStream.DisposeOf;{$ENDIF}
   FAQrCodeSucess        := False;
   LMem                  := TMemoryStream.Create;
   FAQrCodeImageStream   := TMemoryStream.Create;
@@ -4568,7 +4995,16 @@ begin
       if LMem.Size > 3000 Then //Tamanho minimo de uma imagem
       Begin
         LMem.Position := 0;
+        {$IFDEF FPC}
+        LB64Decoder := TBase64DecodingStream.Create(LMem, bdmMIME);
+        try
+          FAQrCodeImageStream.CopyFrom(LB64Decoder, 0);
+        finally
+          LB64Decoder.Free;
+        end;
+        {$ELSE}
         TNetEncoding.Base64.Decode(LMem, FAQrCodeImageStream );
+        {$ENDIF}
         FAQrCodeImageStream.Position := 0;
         FAQrCodeSucess := True;
         FAQrCodeSucess := CreateImage;
@@ -4582,11 +5018,25 @@ begin
   finally
     FAImageDif     := TRUE;
     FreeAndNil(LConvert);
-    LMem.DisposeOf;
+    {$IFDEF FPC}LMem.Free;{$ELSE}LMem.DisposeOf;{$ENDIF}
   end;
 end;
 { TResponseConsoleMessage }
 constructor TResponseConsoleMessage.Create(pAJsonString: string);
+{$IFDEF FPC}
+var
+  lAJsonObj: TJSONData;
+begin
+  lAJsonObj := ParseJSONCompat(pAJsonString);
+  try
+    if not Assigned(lAJsonObj) then
+       Exit;
+   inherited Create(pAJsonString);
+  finally
+    FreeAndNil(lAJsonObj);
+  end;
+end;
+{$ELSE}
 var
   lAJsonObj: TJSONValue;
 begin
@@ -4599,6 +5049,7 @@ begin
     FreeAndNil(lAJsonObj);
   end;
 end;
+{$ENDIF}
 constructor TGroupMetadataClass.Create(pAJsonString: string);
 begin
   inherited Create(pAJsonString);
@@ -4630,12 +5081,40 @@ begin
         FKindTypeNumber := TypList;
 end;
 destructor TChatClass.Destroy;
+var
+  I: Integer;
 begin
   ClearArray(FMessages);
   FreeAndNil(FPresence);
   FreeAndNil(FLastReceivedKey);//.free;
   FreeAndNil(FContact);//.free;
   FreeAndNil(FGroupMetadata);//.free;
+  FreeAndNil(FtcToken);
+  FreeAndNil(FmsgRowOpaqueData);
+  FreeAndNil(FchatlistPreview);
+  FreeAndNil(FpollOptions);
+  FreeAndNil(FPollVotesSnapshot);
+  for I := Length(FMsgs) - 1 downto 0 do
+    FreeAndNil(FMsgs[I]);
+  SetLength(FMsgs, 0);
+  for I := Length(FunreadMentionsOfMe) - 1 downto 0 do
+    FreeAndNil(FunreadMentionsOfMe[I]);
+  SetLength(FunreadMentionsOfMe, 0);
+  for I := Length(FmsgUnsyncedButtonReplyMsgs) - 1 downto 0 do
+    FreeAndNil(FmsgUnsyncedButtonReplyMsgs[I]);
+  SetLength(FmsgUnsyncedButtonReplyMsgs, 0);
+  for I := Length(FListClass) - 1 downto 0 do
+    FreeAndNil(FListClass[I]);
+  SetLength(FListClass, 0);
+  for I := Length(FhydratedButtonsClass) - 1 downto 0 do
+    FreeAndNil(FhydratedButtonsClass[I]);
+  SetLength(FhydratedButtonsClass, 0);
+  for I := Length(FreplyButtonsClass) - 1 downto 0 do
+    FreeAndNil(FreplyButtonsClass[I]);
+  SetLength(FreplyButtonsClass, 0);
+  for I := Length(FDynamicReplyButtons) - 1 downto 0 do
+    FreeAndNil(FDynamicReplyButtons[I]);
+  SetLength(FDynamicReplyButtons, 0);
   inherited;
 end;
 
@@ -4699,15 +5178,43 @@ begin
   inherited Create(pAJsonString);
 end;
 destructor TMessagesClass.Destroy;
+var
+  I: Integer;
 begin
   FreeAndNil(FSender);//.free;
   FreeAndNil(FChat);//.free;
   FreeAndNil(FMediaData);//.free;
+  FreeAndNil(FquotedMsgObj);
+  FreeAndNil(FquotedMsg);
+  FreeAndNil(FscansSidecar);
+  FreeAndNil(FlistResponse);
+  FreeAndNil(FInteractivePayload);
+  FreeAndNil(FInteractiveHeader);
+  FreeAndNil(FPollVotesSnapshot);
+  FreeAndNil(FmessageSecret);
+  FreeAndNil(FctwaContext);
+  FreeAndNil(FchatlistPreview);
+  FreeAndNil(FlimitSharing);
+  for I := Length(FvCardList) - 1 downto 0 do
+    FreeAndNil(FvCardList[I]);
+  SetLength(FvCardList, 0);
+  for I := Length(FButtons) - 1 downto 0 do
+    FreeAndNil(FButtons[I]);
+  SetLength(FButtons, 0);
+  for I := Length(FpollOptions) - 1 downto 0 do
+    FreeAndNil(FpollOptions[I]);
+  SetLength(FpollOptions, 0);
+  for I := Length(FinteractiveAnnotations) - 1 downto 0 do
+    FreeAndNil(FinteractiveAnnotations[I]);
+  SetLength(FinteractiveAnnotations, 0);
+  for I := Length(FunreadMentionsOfMe) - 1 downto 0 do
+    FreeAndNil(FunreadMentionsOfMe[I]);
+  SetLength(FunreadMentionsOfMe, 0);
   inherited;
 end;
 class function TMessagesClass.FromJsonString(AJsonString: string): TMessagesClass;
 begin
-  result := TJson.JsonToObject<TMessagesClass>(AJsonString);
+  {$IFDEF FPC}result := TMessagesClass(CreateFromJsonCompat(TMessagesClass, AJsonString)){$ELSE}result := TJson.JsonToObject<TMessagesClass>(AJsonString){$ENDIF};
 end;
 
 { TResultClass }
@@ -4778,6 +5285,40 @@ end;
 TClassPadrao }
 
 constructor TClassPadrao.Create(pAJsonString: string; PJsonOption: TJsonOptions);
+{$IFDEF FPC}
+var
+  lAJson: TJSONData;
+begin
+  lAJson := ParseJSONCompat(pAJsonString);
+
+  FInjectWorking := False;
+  try
+    try
+      if NOT Assigned(lAJson) then
+        Exit;
+      JsonToObjectCompat(Self, lAJson);
+
+      FJsonString := pAJsonString;
+      SleepNoFreeze(10);
+
+      If LowerCase(SELF.ClassName) <> LowerCase('TResponseConsoleMessage') Then
+      begin
+        LogAdd(PrettyJSON(pAJsonString), SELF.ClassName);
+      end;
+
+      FTypeHeader := StrToTypeHeader(name);
+    except
+      on E : Exception do
+      begin
+        LogAdd(e.Message, 'ERROR ' + SELF.ClassName + #13#10);
+        try LogAdd(PrettyJSON(pAJsonString), ' '); except end;
+      end;
+    end;
+  finally
+    FreeAndNil(lAJson);
+  end;
+end;
+{$ELSE}
 var
   lAJsonObj: TJSONValue;
   lAJsonArray: TJSONArray;
@@ -4817,6 +5358,7 @@ begin
   end;
 
 end;
+{$ENDIF}
 
 (*
 constructor TClassPadrao.Create(pAJsonString: string; PJsonOption: TJsonOptions);
@@ -4888,7 +5430,7 @@ begin
 end;
 function TClassPadrao.ToJsonString: string;
 begin
-  result := TJson.ObjectToJsonString(self);
+  {$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}
 end;
 { TResultClass }
 
@@ -4920,17 +5462,7 @@ var
 begin
    try
     for i:= Length(PArray)-1 downto 0 do
-        {$IFDEF VER300}
-          freeAndNil(PArray[i]);
-        {$ENDIF}
-        {$IFDEF VER330}
-          freeAndNil(PArray[i]);
-        {$ENDIF}
-        {$IFDEF VER340}
-      		// var a: TArray<TClassPadrao>;
-		      // a := TArray<TClassPadrao>(PArray);
-          freeAndNil(TArray<TClassPadrao>(PArray)[i]);
-        {$ENDIF}
+        freeAndNil(TArray<TClassPadrao>(PArray)[i]);
    finally
      SetLength(PArray, 0);
    end;
@@ -5073,6 +5605,24 @@ end;
 
 
 function TUrlIndy.DownLoadInternetFile(Source, Dest: String): Boolean;
+{$IFDEF FPC}
+var
+  LHttp: TFPHTTPClient;
+begin
+  try
+    LHttp := TFPHTTPClient.Create(nil);
+    try
+      LHttp.AllowRedirect := True;
+      LHttp.Get(Source, Dest);
+      Result := True;
+    finally
+      LHttp.Free;
+    end;
+  except
+    Result := False;
+  end;
+end;
+{$ELSE}
 begin
   try
     Result := URLDownloadToFile(nil, PChar(Source), PChar(Dest), 0, nil) = 0
@@ -5080,6 +5630,7 @@ begin
     Result := False;
   end;
 end;
+{$ENDIF}
 
 function TUrlIndy.GetUrl(const Purl: String): Boolean;
 var
@@ -5088,7 +5639,7 @@ begin
   FTImeOutIndy.Interval      := FTimeOut * 1000;
   FTImeOutIndy.Enabled       := False;
   try
-    FReturnUrl.DisposeOf;
+    {$IFDEF FPC}FReturnUrl.Free;{$ELSE}FReturnUrl.DisposeOf;{$ENDIF}
     FReturnUrl               := TMemoryStream.Create;
     FTImeOutIndy.Enabled     := True;
     try
@@ -5143,15 +5694,27 @@ begin
           begin
              // Aurino 03/03/2023
             {$IFNDEF STANDALONE}
+	          {$IFDEF FPC}
+	          Application.MessageBox(PAnsiChar(AnsiString(MSG_Exceptlibeay32dll)), PAnsiChar(AnsiString(Application.Title)), MB_ICONERROR + mb_ok);
+	          {$ELSE}
 	          Application.MessageBox(PWideChar(MSG_Exceptlibeay32dll), PWideChar(Application.Title), MB_ICONERROR + mb_ok);
+	          {$ENDIF}
+          	{$IFDEF FPC}
+          	ShellExecute(0, nil, PAnsiChar(AnsiString('https://wppconnect.io/docs/projects/wpp4delphi/faq#erro-could-not-load-ssl-library')), nil, nil, SW_SHOWNORMAL);
+          	{$ELSE}
           	ShellExecute(0, nil, PChar('https://wppconnect.io/docs/projects/wpp4delphi/faq#erro-could-not-load-ssl-library'), nil, nil, SW_SHOWNORMAL);
+          	{$ENDIF}
             {$ELSE}
             raise exception.create(MSG_Exceptlibeay32dll);
             {$ENDIF}
           end
           else
             {$IFNDEF STANDALONE}
+	          {$IFDEF FPC}
+	          Application.MessageBox(PAnsiChar(AnsiString('Erro HTTP GET (js.abr).' + #10#13+'FAQ request in default browser about "' + LMsg+'"')), PAnsiChar(AnsiString(Application.Title)), MB_ICONWARNING + mb_ok);
+	          {$ELSE}
 	          Application.MessageBox(Pwidechar('Erro HTTP GET (js.abr).' + #10#13+'FAQ request in default browser about "' + LMsg+'"'), PWideChar(Application.Title), MB_ICONWARNING + mb_ok);
+	          {$ENDIF}
             {$ELSE}
             raise exception.create('Erro HTTP GET (js.abr).' + #10#13+'FAQ request in default browser about "' + LMsg+'"');
             {$ENDIF}
@@ -5269,7 +5832,9 @@ end;}
 //Marcelo 01/06/2022
 constructor TResponseGetProfilePicThumb.Create(pAJsonString: string);
 var
+  {$IFNDEF FPC}
   lAJsonObj: TJSONValue;
+  {$ENDIF}
   v : String;
 begin
   // TEMI
@@ -5300,8 +5865,14 @@ TRetornoAllGroups }
 constructor TRetornoAllGroups.Create(pAJsonString: string);
 var
   vJson : string;
+  i : Integer;
+  {$IFDEF FPC}
+  lAJsonObj: TJSONData;
+  lAJsonObj2: TJSONData;
+  {$ELSE}
   lAJsonObj: TJSONValue;
   lAJsonObj2: TJSONValue;
+  {$ENDIF}
 begin
   //inherited Create(pAJsonString);
   FNumbers      := TStringList.create;
@@ -5315,21 +5886,69 @@ begin
   if Trim(FNumbers.Text) = '' then
   begin
     vJson := pAJsonString;
+    {$IFDEF FPC}
+    lAJsonObj := ParseJSONCompat(pAJsonString);
+    try
+      if Assigned(lAJsonObj) and (lAJsonObj.JSONType = jtObject) then
+      begin
+        lAJsonObj2 := TJSONObject(lAJsonObj).Find('result');
+        if Assigned(lAJsonObj2) then
+        begin
+          //Marcelo 10/10/2026 - le o array item a item: decodifica os escapes unicode e nao quebra nomes com virgula/aspas
+          if lAJsonObj2 is TJSONArray then
+          begin
+            FreeAndNil(FNumbers);
+            FNumbers := TStringList.Create;
+            for i := 0 to TJSONArray(lAJsonObj2).Count - 1 do
+              FNumbers.Add(StringReplace(StringReplace(TJSONArray(lAJsonObj2).Items[i].AsString, #13, ' ', [rfReplaceAll]), #10, ' ', [rfReplaceAll]));
+            Exit;
+          end;
+          vJson := Copy(lAJsonObj2.AsJSON, 2, Length(lAJsonObj2.AsJSON) - 2);
+
+          FreeAndNil(FNumbers);
+          FNumbers      := TStringList.create;
+          FNumbers.Text := vJson;
+          FNumbers.Text := StringReplace(FNumbers.Text, '",', Enter, [rfReplaceAll]);
+          FNumbers.Text := StringReplace(FNumbers.Text, '"' , '',    [rfReplaceAll]);
+          FNumbers.Text := StringReplace(FNumbers.Text, '{result:[' , '',    [rfReplaceAll]);
+          FNumbers.Text := StringReplace(FNumbers.Text, ']}' , '',    [rfReplaceAll]);
+        end;
+      end;
+    finally
+      FreeAndNil(lAJsonObj);
+    end;
+    {$ELSE}
     //lAJsonObj := TJSONObject.ParseJSONValue(pAJsonString) as TJSONObject;
     lAJsonObj := TJSONObject.ParseJSONValue(TEncoding.UTF8.GetBytes(pAJsonString),0) as TJSONObject;
+    try
+      if lAJsonObj.TryGetValue('result', lAJsonObj2) then
+      begin
+        //Marcelo 10/10/2026 - le o array item a item: decodifica os escapes unicode e nao quebra nomes com virgula/aspas
+        if lAJsonObj2 is TJSONArray then
+        begin
+          FreeAndNil(FNumbers);
+          FNumbers := TStringList.Create;
+          for i := 0 to TJSONArray(lAJsonObj2).Count - 1 do
+            FNumbers.Add(StringReplace(StringReplace(TJSONArray(lAJsonObj2).Items[i].Value, #13, ' ', [rfReplaceAll]), #10, ' ', [rfReplaceAll]));
+          Exit;
+        end;
+        vJson := Copy(lAJsonObj2.ToJSON,2,Length(lAJsonObj2.ToString)-2);
+        //vJson := Copy(lAJsonObj2.ToJSON,2,Length(lAJsonObj2.ToJSON)-2);
 
-    if lAJsonObj.TryGetValue('result', lAJsonObj2) then
-    begin
-      vJson := Copy(lAJsonObj2.ToJSON,2,Length(lAJsonObj2.ToJSON)-2);
-      //inherited Create(vJson);
-      FNumbers      := TStringList.create;
-      FNumbers.Text := vJson;
-      //Quebrar linhas de acordo com cada valor separado por virgula
-      FNumbers.Text := StringReplace(FNumbers.Text, '",', Enter, [rfReplaceAll]);
-      FNumbers.Text := StringReplace(FNumbers.Text, '"' , '',    [rfReplaceAll]);
-      FNumbers.Text := StringReplace(FNumbers.Text, '{result:[' , '',    [rfReplaceAll]);
-      FNumbers.Text := StringReplace(FNumbers.Text, ']}' , '',    [rfReplaceAll]);
+        //inherited Create(vJson);
+        FreeAndNil(FNumbers);
+        FNumbers      := TStringList.create;
+        FNumbers.Text := vJson;
+        //Quebrar linhas de acordo com cada valor separado por virgula
+        FNumbers.Text := StringReplace(FNumbers.Text, '",', Enter, [rfReplaceAll]);
+        FNumbers.Text := StringReplace(FNumbers.Text, '"' , '',    [rfReplaceAll]);
+        FNumbers.Text := StringReplace(FNumbers.Text, '{result:[' , '',    [rfReplaceAll]);
+        FNumbers.Text := StringReplace(FNumbers.Text, ']}' , '',    [rfReplaceAll]);
+      end;
+    finally
+      FreeAndNil(lAJsonObj);
     end;
+    {$ENDIF}
   end;
 end;
 destructor TRetornoAllGroups.Destroy;
@@ -5340,6 +5959,29 @@ end;
 { TClassGetAllGroupContacts }
 constructor TClassAllGroupContacts.Create(pAJsonString: string;
   PJsonOption: TJsonOptions);
+{$IFDEF FPC}
+var
+  lAJsonObj: TJSONData;
+begin
+  lAJsonObj := ParseJSONCompat(pAJsonString);
+  try
+   try
+    if NOT Assigned(lAJsonObj) then
+       Exit;
+    JsonToObjectCompat(Self, lAJsonObj);
+          SleepNoFreeze(10);
+    If LowerCase(SELF.ClassName) <> LowerCase('TResponseConsoleMessage') Then
+       LogAdd(PrettyJSON(pAJsonString), SELF.ClassName);
+
+   Except
+     on E : Exception do
+       LogAdd(e.Message, 'ERROR ' + SELF.ClassName);
+   end;
+  finally
+    FreeAndNil(lAJsonObj);
+  end;
+end;
+{$ELSE}
 var
   lAJsonObj: TJSONValue;
 begin
@@ -5361,14 +6003,15 @@ begin
     FreeAndNil(lAJsonObj);
   end;
 end;
+{$ENDIF}
 class function TClassAllGroupContacts.FromJsonString(
   AJsonString: string): TClassAllGroupContacts;
 begin
-  result := TJson.JsonToObject<TClassAllGroupContacts>(AJsonString)
+  {$IFDEF FPC}result := TClassAllGroupContacts(CreateFromJsonCompat(TClassAllGroupContacts, AJsonString)){$ELSE}result := TJson.JsonToObject<TClassAllGroupContacts>(AJsonString){$ENDIF}
 end;
 function TClassAllGroupContacts.ToJsonString: string;
 begin
-  result := TJson.ObjectToJsonString(self);
+  {$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}
 end;
 {TResultClass}
 
@@ -5381,27 +6024,32 @@ end;
 
 destructor TResultClass.Destroy;
 begin
-  FId.DisposeOf;
-  FMsgRowOpaqueData.DisposeOf;
+  {$IFDEF FPC}FId.Free;{$ELSE}FId.DisposeOf;{$ENDIF}
+  {$IFDEF FPC}FMsgRowOpaqueData.Free;{$ELSE}FMsgRowOpaqueData.DisposeOf;{$ENDIF}
   inherited;
 end;
 
 class function TResultClass.FromJsonString(AJsonString: string): TResultClass;
 begin
-  result := TJson.JsonToObject<TResultClass>(AJsonString)
+  {$IFDEF FPC}result := TResultClass(CreateFromJsonCompat(TResultClass, AJsonString)){$ELSE}result := TJson.JsonToObject<TResultClass>(AJsonString){$ENDIF}
 end;
 
 function TResultClass.ToJsonString: string;
 begin
-  result := TJson.ObjectToJsonString(self);
+  {$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}
 end;
 
 {TRetornoAllGroupAdmins }
 constructor TRetornoAllGroupAdmins.Create(pAJsonString: string);
 var
   vJson : string;
+  {$IFDEF FPC}
+  lAJsonObj: TJSONData;
+  lAJsonObj2: TJSONData;
+  {$ELSE}
   lAJsonObj: TJSONValue;
   lAJsonObj2: TJSONValue;
+  {$ENDIF}
 begin
   inherited Create(pAJsonString);
   FNumbers      := TStringList.create;
@@ -5418,20 +6066,47 @@ begin
   if Trim(FNumbers.Text) = '' then
   begin
     vJson := pAJsonString;
-    lAJsonObj := TJSONObject.ParseJSONValue(pAJsonString) as TJSONObject;
-
-    if lAJsonObj.TryGetValue('result', lAJsonObj2) then
-    begin
-      vJson := Copy(lAJsonObj2.ToJSON,2,Length(lAJsonObj2.ToJSON)-2);
-      //inherited Create(vJson);
-      FNumbers      := TStringList.create;
-      FNumbers.Text := vJson;
-      //Quebrar linhas de acordo com cada valor separado por virgula
-      FNumbers.Text := StringReplace(FNumbers.Text, '",', Enter, [rfReplaceAll]);
-      FNumbers.Text := StringReplace(FNumbers.Text, '"' , '',    [rfReplaceAll]);
-      FNumbers.Text := StringReplace(FNumbers.Text, '{result:[' , '',    [rfReplaceAll]);
-      FNumbers.Text := StringReplace(FNumbers.Text, ']}' , '',    [rfReplaceAll]);
+    {$IFDEF FPC}
+    lAJsonObj := ParseJSONCompat(pAJsonString);
+    try
+      if Assigned(lAJsonObj) and (lAJsonObj.JSONType = jtObject) then
+      begin
+        lAJsonObj2 := TJSONObject(lAJsonObj).Find('result');
+        if Assigned(lAJsonObj2) then
+        begin
+          vJson := Copy(lAJsonObj2.AsJSON, 2, Length(lAJsonObj2.AsJSON) - 2);
+          FreeAndNil(FNumbers);
+          FNumbers      := TStringList.create;
+          FNumbers.Text := vJson;
+          FNumbers.Text := StringReplace(FNumbers.Text, '",', Enter, [rfReplaceAll]);
+          FNumbers.Text := StringReplace(FNumbers.Text, '"' , '',    [rfReplaceAll]);
+          FNumbers.Text := StringReplace(FNumbers.Text, '{result:[' , '',    [rfReplaceAll]);
+          FNumbers.Text := StringReplace(FNumbers.Text, ']}' , '',    [rfReplaceAll]);
+        end;
+      end;
+    finally
+      FreeAndNil(lAJsonObj);
     end;
+    {$ELSE}
+    lAJsonObj := TJSONObject.ParseJSONValue(pAJsonString) as TJSONObject;
+    try
+      if lAJsonObj.TryGetValue('result', lAJsonObj2) then
+      begin
+        vJson := Copy(lAJsonObj2.ToJSON,2,Length(lAJsonObj2.ToJSON)-2);
+        //inherited Create(vJson);
+        FreeAndNil(FNumbers);
+        FNumbers      := TStringList.create;
+        FNumbers.Text := vJson;
+        //Quebrar linhas de acordo com cada valor separado por virgula
+        FNumbers.Text := StringReplace(FNumbers.Text, '",', Enter, [rfReplaceAll]);
+        FNumbers.Text := StringReplace(FNumbers.Text, '"' , '',    [rfReplaceAll]);
+        FNumbers.Text := StringReplace(FNumbers.Text, '{result:[' , '',    [rfReplaceAll]);
+        FNumbers.Text := StringReplace(FNumbers.Text, ']}' , '',    [rfReplaceAll]);
+      end;
+    finally
+      FreeAndNil(lAJsonObj);
+    end;
+    {$ENDIF}
   end;
 
 end;
@@ -5490,20 +6165,178 @@ end;
 
 destructor TResponsesendTextMessage.Destroy;
 begin
-  FMessageClass.DisposeOf;
+  {$IFDEF FPC}FMessageClass.Free;{$ELSE}FMessageClass.DisposeOf;{$ENDIF}
   inherited;
 end;
 
 class function TResponsesendTextMessage.FromJsonString(AJsonString: string): TResponsesendTextMessage;
 
 begin
-  result := TJson.JsonToObject<TResponsesendTextMessage>(AJsonString);
+  {$IFDEF FPC}result := TResponsesendTextMessage(CreateFromJsonCompat(TResponsesendTextMessage, AJsonString)){$ELSE}result := TJson.JsonToObject<TResponsesendTextMessage>(AJsonString){$ENDIF};
 end;
 
 function TResponsesendTextMessage.ToJsonString: string;
 
 begin
-  result := TJson.ObjectToJsonString(self);
+  {$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}
+end;
+
+{ TGroupInfoClass }
+
+destructor TGroupInfoClass.Destroy;
+var
+  i: Integer;
+begin
+  for i := 0 to High(FParticipants) do
+    FParticipants[i].Free;
+  SetLength(FParticipants, 0);
+  inherited;
+end;
+
+{ TGroupMessageInfoClass }
+
+destructor TGroupMessageInfoClass.Destroy;
+var
+  i: Integer;
+begin
+  for i := 0 to High(FParticipants) do
+    FParticipants[i].Free;
+  SetLength(FParticipants, 0);
+  inherited;
+end;
+
+{ TGroupListClass }
+
+destructor TGroupListClass.Destroy;
+var
+  i: Integer;
+begin
+  for i := 0 to High(FGroups) do
+    FGroups[i].Free;
+  SetLength(FGroups, 0);
+  inherited;
+end;
+
+{ TGroupMembershipRequestsClass }
+
+destructor TGroupMembershipRequestsClass.Destroy;
+var
+  i: Integer;
+begin
+  for i := 0 to High(FRequests) do
+    FRequests[i].Free;
+  SetLength(FRequests, 0);
+  inherited;
+end;
+
+{ TStatusTrackClass }
+
+constructor TStatusTrackClass.Create(const AStatusKey, AStatusID, ASeuID, ASeuID2, ASeuID3, ASeuID4: String);
+begin
+  inherited Create;
+  FStatusKey := AStatusKey;
+  FStatusID  := AStatusID;
+  FSeuID     := ASeuID;
+  FSeuID2    := ASeuID2;
+  FSeuID3    := ASeuID3;
+  FSeuID4    := ASeuID4;
+  FSentAt    := Now;
+  FDelivered := TStringList.Create;
+  FDelivered.Sorted := True;
+  FDelivered.Duplicates := dupIgnore;
+  FViewed := TStringList.Create;
+  FViewed.Sorted := True;
+  FViewed.Duplicates := dupIgnore;
+  FReactions := TStringList.Create;
+end;
+
+destructor TStatusTrackClass.Destroy;
+begin
+  FreeAndNil(FDelivered);
+  FreeAndNil(FViewed);
+  FreeAndNil(FReactions);
+  inherited;
+end;
+
+class function TStatusTrackClass.ExtractStatusKey(const AMessageID: String): String;
+const
+  cPrefix = 'status@broadcast_';
+var
+  p: Integer;
+  LRest: String;
+begin
+  Result := '';
+  p := Pos(cPrefix, AMessageID);
+  if p = 0 then
+    Exit;
+  LRest := Copy(AMessageID, p + Length(cPrefix), MaxInt);
+  p := Pos('_', LRest);
+  if p > 0 then
+    Result := Copy(LRest, 1, p - 1)
+  else
+    Result := LRest;
+end;
+
+function TStatusTrackClass.GetDeliveredCount: Integer;
+begin
+  Result := FDelivered.Count;
+end;
+
+function TStatusTrackClass.GetViewedCount: Integer;
+begin
+  Result := FViewed.Count;
+end;
+
+function TStatusTrackClass.GetReactionCount: Integer;
+begin
+  Result := FReactions.Count;
+end;
+
+function TStatusTrackClass.RegisterAck(const ASender: String; AAck: Integer): Boolean;
+begin
+  Result := False;
+  if AAck = 1 then
+  begin
+    Result := not FServerReceived;
+    FServerReceived := True;
+    Exit;
+  end;
+  if (AAck < 2) or (ASender = '') then
+    Exit;
+  //Quem viu (ack 3) tambem recebeu
+  if FDelivered.IndexOf(ASender) < 0 then
+  begin
+    FDelivered.Add(ASender);
+    Result := True;
+  end;
+  if (AAck >= 3) and (FViewed.IndexOf(ASender) < 0) then
+  begin
+    FViewed.Add(ASender);
+    Result := True;
+  end;
+end;
+
+function TStatusTrackClass.RegisterReaction(const ASender, AReaction: String): Boolean;
+var
+  i: Integer;
+begin
+  Result := False;
+  if ASender = '' then
+    Exit;
+  i := FReactions.IndexOfName(ASender);
+  if AReaction = '' then
+  begin
+    if i >= 0 then
+    begin
+      FReactions.Delete(i);
+      Result := True;
+    end;
+    Exit;
+  end;
+  if (i >= 0) and (FReactions.ValueFromIndex[i] = AReaction) then
+    Exit;
+  FReactions.Values[ASender] := AReaction;
+  Result := True;
 end;
 
 { TProductList }
@@ -5517,13 +6350,13 @@ end;
 class function TProductList.FromJsonString(AJsonString: string): TProductList;
 
 begin
-  result := TJson.JsonToObject<TProductList>(AJsonString);
+  {$IFDEF FPC}result := TProductList(CreateFromJsonCompat(TProductList, AJsonString)){$ELSE}result := TJson.JsonToObject<TProductList>(AJsonString){$ENDIF};
 end;
 
 function TProductList.ToJsonString: string;
 
 begin
-  result := TJson.ObjectToJsonString(self);
+  {$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}
 end;
 
 { TProductsList }
@@ -5545,12 +6378,12 @@ end;
 
 class function TProductsList.FromJsonString(AJsonString: string): TProductsList;
 begin
-  result := TJson.JsonToObject<TProductsList>(AJsonString);
+  {$IFDEF FPC}result := TProductsList(CreateFromJsonCompat(TProductsList, AJsonString)){$ELSE}result := TJson.JsonToObject<TProductsList>(AJsonString){$ENDIF};
 end;
 
 function TProductsList.ToJsonString: string;
 begin
-  result := TJson.ObjectToJsonString(self);
+  {$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}
 end;
 
 
@@ -5565,7 +6398,7 @@ end;
 
 destructor TWppCrashClass.Destroy;
 begin
-  FResult.DisposeOf;
+  {$IFDEF FPC}FResult.Free;{$ELSE}FResult.DisposeOf;{$ENDIF}
   inherited;
 end;
 
@@ -5601,10 +6434,12 @@ end;
 constructor TRootClass.Create(pAJsonString: string);
 var
   vJson, v : string;
+  {$IFNDEF FPC}
   lAJsonObj: TJSONValue;
   lAJsonObj2: TJSONValue;
   lAJsonObj3: TJSONValue;
   myarr: TJSONArray;
+  {$ENDIF}
 begin
 
   //SalvaLog(v, 'CONSOLE');
@@ -5671,20 +6506,23 @@ begin
 end;
 
 destructor TRootClass.Destroy;
+var
+  I: Integer;
 begin
-  //ClearArray(FResult);
-  //FreeAndNil(FPresence);
-  //inherited;
+  for I := Length(FResult) - 1 downto 0 do
+    FreeAndNil(FResult[I]);
+  SetLength(FResult, 0);
+  inherited;
 end;
 
 class function TRootClass.FromJsonString(AJsonString: string): TRootClass;
 begin
-  result := TJson.JsonToObject<TRootClass>(AJsonString)
+  {$IFDEF FPC}result := TRootClass(CreateFromJsonCompat(TRootClass, AJsonString)){$ELSE}result := TJson.JsonToObject<TRootClass>(AJsonString){$ENDIF}
 end;
 
 function TRootClass.ToJsonString: string;
 begin
-  result := TJson.ObjectToJsonString(self);
+  {$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}
 end;
 
 { TJsonSringResult }
@@ -5752,8 +6590,13 @@ end;
 constructor TRetornoAllCommunitys.Create(pAJsonString: string);
 var
   vJson : string;
+  {$IFDEF FPC}
+  lAJsonObj: TJSONData;
+  lAJsonObj2: TJSONData;
+  {$ELSE}
   lAJsonObj: TJSONValue;
   lAJsonObj2: TJSONValue;
+  {$ENDIF}
 begin
   //inherited Create(pAJsonString);
   FNumbers      := TStringList.create;
@@ -5767,20 +6610,47 @@ begin
   if Trim(FNumbers.Text) = '' then
   begin
     vJson := pAJsonString;
-    lAJsonObj := TJSONObject.ParseJSONValue(pAJsonString) as TJSONObject;
-
-    if lAJsonObj.TryGetValue('result', lAJsonObj2) then
-    begin
-      vJson := Copy(lAJsonObj2.ToJSON,2,Length(lAJsonObj2.ToJSON)-2);
-      //inherited Create(vJson);
-      FNumbers      := TStringList.create;
-      FNumbers.Text := vJson;
-      //Quebrar linhas de acordo com cada valor separado por virgula
-      FNumbers.Text := StringReplace(FNumbers.Text, '",', Enter, [rfReplaceAll]);
-      FNumbers.Text := StringReplace(FNumbers.Text, '"' , '',    [rfReplaceAll]);
-      FNumbers.Text := StringReplace(FNumbers.Text, '{result:[' , '',    [rfReplaceAll]);
-      FNumbers.Text := StringReplace(FNumbers.Text, ']}' , '',    [rfReplaceAll]);
+    {$IFDEF FPC}
+    lAJsonObj := ParseJSONCompat(pAJsonString);
+    try
+      if Assigned(lAJsonObj) and (lAJsonObj.JSONType = jtObject) then
+      begin
+        lAJsonObj2 := TJSONObject(lAJsonObj).Find('result');
+        if Assigned(lAJsonObj2) then
+        begin
+          vJson := Copy(lAJsonObj2.AsJSON, 2, Length(lAJsonObj2.AsJSON) - 2);
+          FreeAndNil(FNumbers);
+          FNumbers      := TStringList.create;
+          FNumbers.Text := vJson;
+          FNumbers.Text := StringReplace(FNumbers.Text, '",', Enter, [rfReplaceAll]);
+          FNumbers.Text := StringReplace(FNumbers.Text, '"' , '',    [rfReplaceAll]);
+          FNumbers.Text := StringReplace(FNumbers.Text, '{result:[' , '',    [rfReplaceAll]);
+          FNumbers.Text := StringReplace(FNumbers.Text, ']}' , '',    [rfReplaceAll]);
+        end;
+      end;
+    finally
+      FreeAndNil(lAJsonObj);
     end;
+    {$ELSE}
+    lAJsonObj := TJSONObject.ParseJSONValue(pAJsonString) as TJSONObject;
+    try
+      if lAJsonObj.TryGetValue('result', lAJsonObj2) then
+      begin
+        vJson := Copy(lAJsonObj2.ToJSON,2,Length(lAJsonObj2.ToJSON)-2);
+        //inherited Create(vJson);
+        FreeAndNil(FNumbers);
+        FNumbers      := TStringList.create;
+        FNumbers.Text := vJson;
+        //Quebrar linhas de acordo com cada valor separado por virgula
+        FNumbers.Text := StringReplace(FNumbers.Text, '",', Enter, [rfReplaceAll]);
+        FNumbers.Text := StringReplace(FNumbers.Text, '"' , '',    [rfReplaceAll]);
+        FNumbers.Text := StringReplace(FNumbers.Text, '{result:[' , '',    [rfReplaceAll]);
+        FNumbers.Text := StringReplace(FNumbers.Text, ']}' , '',    [rfReplaceAll]);
+      end;
+    finally
+      FreeAndNil(lAJsonObj);
+    end;
+    {$ENDIF}
   end;
 end;
 
@@ -5795,48 +6665,101 @@ end;
 constructor TResponsegetMessageACK.Create(pAJsonString: string);
 var
   vJson, UniqueID : String;
+  {$IFDEF FPC}
+  lAJsonObj: TJSONData;
+  lAJsonObj2: TJSONData;
+  lAJsonObj4: TJSONData;
+  lAJsonObjB: TJSONData;
+  lAJsonObjC: TJSONData;
+  {$ELSE}
   lAJsonObj: TJSONValue;
   lAJsonObj2: TJSONValue;
-  lAJsonObj3: TJSONValue;
   lAJsonObj4: TJSONValue;
-  myarr: TJSONArray;
+  lAJsonObjB: TJSONValue;
+  lAJsonObjC: TJSONValue;
+  {$ENDIF}
 begin
   vJson := copy(pAJsonString, 11, length(pAJsonString) - 11);
   fidMessage := '';
 
-  lAJsonObj := TJSONObject.ParseJSONValue(pAJsonString) as TJSONObject;
-
-  if lAJsonObj.TryGetValue('result', lAJsonObj2) then
-  begin
-    vJson := lAJsonObj2.ToJSON;
-    lAJsonObj := TJSONObject.ParseJSONValue(vJson) as TJSONObject;
-
-    fidMessage := '';
-    //{"idMessage":"true_551734226371@c.us_3EB02797217197505925",
-    UniqueID := Copy(vJson,1, pos('"JsonMessage":', vJson)-1);
-
-    //JsonMessage
-    if lAJsonObj.TryGetValue('JsonMessage', lAJsonObj4) then
+  lAJsonObjB := nil;
+  lAJsonObjC := nil;
+  {$IFDEF FPC}
+  lAJsonObj := ParseJSONCompat(pAJsonString);
+  try
+    if Assigned(lAJsonObj) and (lAJsonObj.JSONType = jtObject) then
     begin
-      vJson := Copy(lAJsonObj4.ToJSON,2,Length(lAJsonObj4.ToJSON)-2);
-      lAJsonObj := TJSONObject.ParseJSONValue(vJson) as TJSONObject;
-      //vJson := lAJsonObj.ToString;
-      //vJson := Copy(lAJsonObj.ToJSON,2,Length(lAJsonObj.ToJSON)-2);
+      lAJsonObj2 := TJSONObject(lAJsonObj).Find('result');
+      if Assigned(lAJsonObj2) then
+      begin
+        vJson := lAJsonObj2.AsJSON;
+        lAJsonObjB := ParseJSONCompat(vJson);
 
-      vJson := stringreplace(vJson, '\"', '"', [rfReplaceAll, rfIgnoreCase]);
-      vJson := stringreplace(vJson, '{"ack"', UniqueID + '"ack"', [rfReplaceAll, rfIgnoreCase]);
+        fidMessage := '';
+        //{"idMessage":"true_551734226371@c.us_3EB02797217197505925",
+        UniqueID := Copy(vJson,1, pos('"JsonMessage":', vJson)-1);
 
-      TResponsegetMessageACK.FromJsonString(vJson);
-      inherited Create(vJson);
+        //JsonMessage
+        if Assigned(lAJsonObjB) and (lAJsonObjB.JSONType = jtObject) then
+        begin
+          lAJsonObj4 := TJSONObject(lAJsonObjB).Find('JsonMessage');
+          if Assigned(lAJsonObj4) then
+          begin
+            vJson := Copy(lAJsonObj4.AsJSON,2,Length(lAJsonObj4.AsJSON)-2);
+            lAJsonObjC := ParseJSONCompat(vJson);
+
+            vJson := stringreplace(vJson, '\"', '"', [rfReplaceAll, rfIgnoreCase]);
+            vJson := stringreplace(vJson, '{"ack"', UniqueID + '"ack"', [rfReplaceAll, rfIgnoreCase]);
+
+            inherited Create(vJson);
+          end;
+        end;
+      end;
     end;
-
-
-    {if lAJsonObj.TryGetValue('result', lAJsonObj3) then
-    begin
-      vJson := Copy(lAJsonObj3.ToJSON,2,Length(lAJsonObj3.ToJSON)-2);
-
-    end;}
+  finally
+    FreeAndNil(lAJsonObj);
+    FreeAndNil(lAJsonObjB);
+    FreeAndNil(lAJsonObjC);
   end;
+  {$ELSE}
+  lAJsonObj := TJSONObject.ParseJSONValue(pAJsonString) as TJSONObject;
+  try
+    if lAJsonObj.TryGetValue('result', lAJsonObj2) then
+    begin
+      vJson := lAJsonObj2.ToJSON;
+      lAJsonObjB := TJSONObject.ParseJSONValue(vJson) as TJSONObject;
+
+      fidMessage := '';
+      //{"idMessage":"true_551734226371@c.us_3EB02797217197505925",
+      UniqueID := Copy(vJson,1, pos('"JsonMessage":', vJson)-1);
+
+      //JsonMessage
+      if lAJsonObjB.TryGetValue('JsonMessage', lAJsonObj4) then
+      begin
+        vJson := Copy(lAJsonObj4.ToJSON,2,Length(lAJsonObj4.ToJSON)-2);
+        lAJsonObjC := TJSONObject.ParseJSONValue(vJson) as TJSONObject;
+        //vJson := lAJsonObj.ToString;
+        //vJson := Copy(lAJsonObj.ToJSON,2,Length(lAJsonObj.ToJSON)-2);
+
+        vJson := stringreplace(vJson, '\"', '"', [rfReplaceAll, rfIgnoreCase]);
+        vJson := stringreplace(vJson, '{"ack"', UniqueID + '"ack"', [rfReplaceAll, rfIgnoreCase]);
+
+        inherited Create(vJson);
+      end;
+
+
+      {if lAJsonObj.TryGetValue('result', lAJsonObj3) then
+      begin
+        vJson := Copy(lAJsonObj3.ToJSON,2,Length(lAJsonObj3.ToJSON)-2);
+
+      end;}
+    end;
+  finally
+    FreeAndNil(lAJsonObj);
+    FreeAndNil(lAJsonObjB);
+    FreeAndNil(lAJsonObjC);
+  end;
+  {$ENDIF}
 
 
   //inherited Create(v);
@@ -5856,23 +6779,25 @@ end;
 
 class function TResponsegetMessageACK.FromJsonString(AJsonString: string): TResponsegetMessageACK;
 begin
-  result := TJson.JsonToObject<TResponsegetMessageACK>(AJsonString)
+  {$IFDEF FPC}result := TResponsegetMessageACK(CreateFromJsonCompat(TResponsegetMessageACK, AJsonString)){$ELSE}result := TJson.JsonToObject<TResponsegetMessageACK>(AJsonString){$ENDIF}
 end;
 
 function TResponsegetMessageACK.ToJsonString: string;
 begin
-  result := TJson.ObjectToJsonString(self);
+  {$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}
 end;
 
 { TIsOnline }
 
 constructor TIsOnline.Create(pAJsonString: string);
+{$IFNDEF FPC}
 var
   vJson : string;
   lAJsonObj: TJSONValue;
   lAJsonObj2: TJSONValue;
   lAJsonObj3: TJSONValue;
   myarr: TJSONArray;
+{$ENDIF}
 begin
   if pos('true', pAJsonString) > 0 then
     FIsOnline := True else
@@ -5917,28 +6842,69 @@ end;
 { TOutgoingCall }
 
 constructor TOutgoingCall.Create(pAJsonString: string);
+{$IFDEF FPC}
+var
+  vJson : string;
+  lAJsonObj: TJSONData;
+  lAJsonObj2: TJSONData;
+  lAJsonObj3: TJSONData;
+  lAJsonObjB: TJSONData;
+begin
+  vJson := pAJsonString;
+  lAJsonObjB := nil;
+  lAJsonObj := ParseJSONCompat(pAJsonString);
+  try
+    if Assigned(lAJsonObj) and (lAJsonObj.JSONType = jtObject) then
+    begin
+      lAJsonObj2 := TJSONObject(lAJsonObj).Find('result');
+      if Assigned(lAJsonObj2) then
+      begin
+        vJson := lAJsonObj2.AsJSON;
+        lAJsonObjB := ParseJSONCompat(vJson);
+        if Assigned(lAJsonObjB) and (lAJsonObjB.JSONType = jtObject) then
+        begin
+          lAJsonObj3 := TJSONObject(lAJsonObjB).Find('result');
+          if Assigned(lAJsonObj3) then
+          begin
+            vJson := Copy(lAJsonObj3.AsJSON, 2, Length(lAJsonObj3.AsJSON) - 2);
+            inherited Create(vJson);
+          end;
+        end;
+      end;
+    end;
+  finally
+    FreeAndNil(lAJsonObj);
+    FreeAndNil(lAJsonObjB);
+  end;
+end;
+{$ELSE}
 var
   vJson : string;
   lAJsonObj: TJSONValue;
   lAJsonObj2: TJSONValue;
   lAJsonObj3: TJSONValue;
-  myarr: TJSONArray;
+  lAJsonObjB: TJSONValue;
 begin
   vJson := pAJsonString;
+  lAJsonObjB := nil;
   lAJsonObj := TJSONObject.ParseJSONValue(pAJsonString) as TJSONObject;
-
-  if lAJsonObj.TryGetValue('result', lAJsonObj2) then
-  begin
-    vJson := lAJsonObj2.ToJSON;
-    lAJsonObj := TJSONObject.ParseJSONValue(vJson) as TJSONObject;
-    if lAJsonObj.TryGetValue('result', lAJsonObj3) then
+  try
+    if lAJsonObj.TryGetValue('result', lAJsonObj2) then
     begin
-      vJson := Copy(lAJsonObj3.ToJSON,2,Length(lAJsonObj3.ToJSON)-2);
-      inherited Create(vJson);
+      vJson := lAJsonObj2.ToJSON;
+      lAJsonObjB := TJSONObject.ParseJSONValue(vJson) as TJSONObject;
+      if lAJsonObjB.TryGetValue('result', lAJsonObj3) then
+      begin
+        vJson := Copy(lAJsonObj3.ToJSON,2,Length(lAJsonObj3.ToJSON)-2);
+        inherited Create(vJson);
+      end;
     end;
+  finally
+    FreeAndNil(lAJsonObj);
+    FreeAndNil(lAJsonObjB);
   end;
-
 end;
+{$ENDIF}
 
 destructor TOutgoingCall.Destroy;
 begin
@@ -5947,12 +6913,12 @@ end;
 
 class function TOutgoingCall.FromJsonString(AJsonString: string): TOutgoingCall;
 begin
-  result := TJson.JsonToObject<TOutgoingCall>(AJsonString)
+  {$IFDEF FPC}result := TOutgoingCall(CreateFromJsonCompat(TOutgoingCall, AJsonString)){$ELSE}result := TJson.JsonToObject<TOutgoingCall>(AJsonString){$ENDIF}
 end;
 
 function TOutgoingCall.ToJsonString: string;
 begin
-  result := TJson.ObjectToJsonString(self);  result := TJson.ObjectToJsonString(self);
+  {$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}  {$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}
 end;
 
 { EnvneedsUpdate }
@@ -5973,34 +6939,39 @@ end;
 
 class function TDynamicReplyButtonsClass.FromJsonString(AJsonString: string): TDynamicReplyButtonsClass;
 begin
-  result := TJson.JsonToObject<TDynamicReplyButtonsClass>(AJsonString);
+  {$IFDEF FPC}result := TDynamicReplyButtonsClass(CreateFromJsonCompat(TDynamicReplyButtonsClass, AJsonString)){$ELSE}result := TJson.JsonToObject<TDynamicReplyButtonsClass>(AJsonString){$ENDIF};
 end;
 
 function TDynamicReplyButtonsClass.ToJsonString: string;
 begin
-  result := TJson.ObjectToJsonString(self);
+  {$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}
 end;
 
 { TReplyButtonsClass }
 
 class function TReplyButtonsClass.FromJsonString(AJsonString: string): TReplyButtonsClass;
 begin
-  result := TJson.JsonToObject<TReplyButtonsClass>(AJsonString)
+  {$IFDEF FPC}result := TReplyButtonsClass(CreateFromJsonCompat(TReplyButtonsClass, AJsonString)){$ELSE}result := TJson.JsonToObject<TReplyButtonsClass>(AJsonString){$ENDIF}
 end;
 
 function TReplyButtonsClass.ToJsonString: string;
 begin
-  result := TJson.ObjectToJsonString(self);
+  {$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}
 end;
 
 { TListClass }
 
 class function TListClass.FromJsonString(AJsonString: string): TListClass;
 begin
-  result := TJson.JsonToObject<TListClass>(AJsonString)
+  {$IFDEF FPC}result := TListClass(CreateFromJsonCompat(TListClass, AJsonString)){$ELSE}result := TJson.JsonToObject<TListClass>(AJsonString){$ENDIF}
 end;
 
 function TListClass.ToJsonString: string;
+{$IFDEF FPC}
+begin
+  Result := ObjectToJsonCompat(Self);
+end;
+{$ELSE}
 var
   JSON: TJSONObject;
   JSONString: TStringStream;
@@ -6018,22 +6989,24 @@ begin
     JSON.Free;
   end;
 
-  //result := TJson.ObjectToJsonString(self);
+  //{$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}
 end;
+{$ENDIF}
 
 { ThydratedButtonsClass }
 
 class function ThydratedButtonsClass.FromJsonString(AJsonString: string): ThydratedButtonsClass;
 begin
-  result := TJson.JsonToObject<ThydratedButtonsClass>(AJsonString);
+  {$IFDEF FPC}result := ThydratedButtonsClass(CreateFromJsonCompat(ThydratedButtonsClass, AJsonString)){$ELSE}result := TJson.JsonToObject<ThydratedButtonsClass>(AJsonString){$ENDIF};
 end;
 
 function ThydratedButtonsClass.ToJsonString: string;
 begin
-  result := TJson.ObjectToJsonString(self);
+  {$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}
 end;
 
 { TUrlREST }
+{$IFNDEF FPC}
 
 constructor TUrlREST.Create(AOwner: TComponent);
 begin
@@ -6071,7 +7044,7 @@ var
 begin
   jsSL:= nil; // pp: fix for E1036 Variable 'jsSL' might not have been initialized
   try
-    FReturnUrl.DisposeOf;
+    {$IFDEF FPC}FReturnUrl.Free;{$ELSE}FReturnUrl.DisposeOf;{$ENDIF}
     FReturnUrl := TMemoryStream.Create;
     jsSL := TStringList.Create;
     try
@@ -6105,6 +7078,7 @@ begin
     Result                := FReturnUrl.size > 0;
   end;
 end;
+{$ENDIF}
 
 { TIsRequire_auth }
 
@@ -6122,12 +7096,12 @@ end;
 
 class function THydratedButtonsClass2.FromJsonString(AJsonString: string): THydratedButtonsClass2;
 begin
-  result := TJson.JsonToObject<ThydratedButtonsClass2>(AJsonString);
+  {$IFDEF FPC}result := ThydratedButtonsClass2(CreateFromJsonCompat(ThydratedButtonsClass2, AJsonString)){$ELSE}result := TJson.JsonToObject<ThydratedButtonsClass2>(AJsonString){$ENDIF};
 end;
 
 function THydratedButtonsClass2.ToJsonString: string;
 begin
-  result := TJson.ObjectToJsonString(self);
+  {$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}
 end;
 
 { TctwaContextClass }
@@ -6164,12 +7138,12 @@ end;
 
 class function TdeleteMessageNewResponseClass.FromJsonString(AJsonString: string): TdeleteMessageNewResponseClass;
 begin
-  result := TJson.JsonToObject<TdeleteMessageNewResponseClass>(AJsonString);
+  {$IFDEF FPC}result := TdeleteMessageNewResponseClass(CreateFromJsonCompat(TdeleteMessageNewResponseClass, AJsonString)){$ELSE}result := TJson.JsonToObject<TdeleteMessageNewResponseClass>(AJsonString){$ENDIF};
 end;
 
 function TdeleteMessageNewResponseClass.ToJsonString: string;
 begin
-  result := TJson.ObjectToJsonString(self);
+  {$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}
 end;
 
 { TIsLidMigrated }
@@ -6191,12 +7165,12 @@ end;
 class function TAck_changeClass.FromJsonString(
   AJsonString: string): TAck_changeClass;
 begin
-  result := TJson.JsonToObject<TAck_changeClass>(AJsonString);
+  {$IFDEF FPC}result := TAck_changeClass(CreateFromJsonCompat(TAck_changeClass, AJsonString)){$ELSE}result := TJson.JsonToObject<TAck_changeClass>(AJsonString){$ENDIF};
 end;
 
 function TAck_changeClass.ToJsonString: string;
 begin
-  result := TJson.ObjectToJsonString(self);
+  {$IFDEF FPC}result := ObjectToJsonCompat(Self);{$ELSE}result := TJson.ObjectToJsonString(self);{$ENDIF}
 end;
 
 end.

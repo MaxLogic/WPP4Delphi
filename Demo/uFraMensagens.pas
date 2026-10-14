@@ -104,6 +104,8 @@ type
     SendPix: TButton;
     SendDocumentButton: TButton;
     btnSendVideoButton: TButton;
+    btnCarouselMessage: TButton;
+    btnBookingMessage: TButton;
     procedure edtURLDblClick(Sender: TObject);
     procedure btnTextoSimplesClick(Sender: TObject);
     procedure btnBotaoSimplesClick(Sender: TObject);
@@ -161,6 +163,8 @@ type
     procedure SendPixClick(Sender: TObject);
     procedure SendDocumentButtonClick(Sender: TObject);
     procedure btnSendVideoButtonClick(Sender: TObject);
+    procedure btnCarouselMessageClick(Sender: TObject);
+    procedure btnBookingMessageClick(Sender: TObject);
   private
     { Private declarations }
      FStatus: Boolean;
@@ -708,7 +712,7 @@ begin
 
       options :=
         'createChat: true, ' +
-        ///'useTemplateButtons: undefined, ' + //deprecated
+        //'useTemplateButtons: undefined, ' + //deprecated
         //'useTemplateButtons: true, ' + //deprecated
         //'useInteractiveMesssage: true, ' + //Android AND iOS WORKING
         'footer: "Image With Button",  ' +
@@ -836,7 +840,6 @@ begin
       options :=
         'createChat: true, ' +
         ///'useTemplateButtons: undefined, ' +
-        'useTemplateButtons: true, ' + //Crash iOS True
         //'title: "Novidades",  ' +
         //'footer: "Imagem com Botão",  ' +
         'caption: "My image", ' +
@@ -847,15 +850,7 @@ begin
         '    text: "Acesse Nosso Site" ' +
         '  }, ' +
         '{phoneNumber: "551734265560", text: "☎️ Qualquer Dúvida Ligue"},' +
-
-        '  { ' +
-        '    id: "001",  ' +
-        '    text: "Show de Bola"  ' +
-        '  },  ' +
-        '  {  ' +
-        '    id: "002",  ' +
-        '    text: "Curti"  ' +
-        '  }  ' +
+        //Reply Buttons (id) não podem ser misturados com Action Buttons (url/phoneNumber)
         ']  ';
 
       options_Figurinha := 'type: "sticker"';
@@ -1308,7 +1303,7 @@ begin
       //options := 'backgroundColor: "#0275d8", font: 2';
       //https://wppconnect-team.github.io/wa-js/interfaces/status.TextStatusOptions.html
 
-      frDemo.TWPPConnect1.sendImageStatus(LBase64.Text, options);
+      frDemo.TWPPConnect1.sendImageStatus(LBase64.Text, options, 'STATUS_IMG');
 
     finally
       freeAndNil(LBase64);
@@ -1334,7 +1329,7 @@ begin
     //options := 'backgroundColor: "#0275d8", font: 2';
     //https://wppconnect-team.github.io/wa-js/interfaces/status.TextStatusOptions.html
 
-    frDemo.TWPPConnect1.sendTextStatus(content, options);
+    frDemo.TWPPConnect1.sendTextStatus(content, options, 'STATUS_TXT');
 
   finally
     ed_num.SelectAll;
@@ -1392,15 +1387,8 @@ begin
         '    url: "https://wppconnect-team.github.io/", ' +
         '    text: "Acesse Nosso Site" ' +
         '  }, ' +
-        '{phoneNumber: "551734265560", text: "☎️ Qualquer Dúvida Ligue"},' +
-        '  { ' +
-        '    id: "001",  ' +
-        '    text: "Show de Bola"  ' +
-        '  },  ' +
-        '  {  ' +
-        '    id: "002",  ' +
-        '    text: "Curti"  ' +
-        '  }  ' +
+        '{phoneNumber: "551734265560", text: "☎️ Qualquer Dúvida Ligue"}' +
+        //Reply Buttons (id) não podem ser misturados com Action Buttons (url/phoneNumber)
         ']  ';
 
       options_Figurinha := 'type: "sticker"';
@@ -1669,7 +1657,7 @@ begin
       //options := 'backgroundColor: "#0275d8", font: 2';
       //https://wppconnect-team.github.io/wa-js/interfaces/status.TextStatusOptions.html
 
-      frDemo.TWPPConnect1.sendImageStatus(LBase64.Text, options);
+      frDemo.TWPPConnect1.sendImageStatus(LBase64.Text, options, 'STATUS_IMG');
 
     finally
       freeAndNil(LBase64);
@@ -1910,6 +1898,113 @@ begin
     //Optional Parameters SeuID, SeuID2, SeuID3 and SeuID4
     frDemo.TWPPConnect1.SendTextMessageNew(ed_num.Text, mem_message.Text, options, 'SEUID1', 'SEUID2', 'SEUID3', 'SEUID4');
 
+  finally
+    ed_num.SelectAll;
+    ed_num.SetFocus;
+  end;
+end;
+
+procedure TframeMensagem.btnCarouselMessageClick(Sender: TObject);
+var
+  options, imgBase64 : string;
+  LBase64 : TStringList;
+begin
+  //Adicionado Por Marcelo 09/10/2026
+  try
+    if Trim(ed_num.Text) = '' then
+    begin
+      messageDlg('Informe o Celular para Continuar', mtWarning, [mbOk], 0);
+      ed_num.SetFocus;
+      Exit;
+    end;
+
+    if not frDemo.TWPPConnect1.Auth(False) then
+      Exit;
+
+    LBase64 := TStringList.Create;
+    try
+      //Cards do carrossel aceitam somente imagem em Base64/DataURI (URL externa nao e suportada)
+      if FileExists('C:\Executaveis\WPPConnectDemo\Base64Imagem.txt') then
+        LBase64.LoadFromFile('C:\Executaveis\WPPConnectDemo\Base64Imagem.txt')
+      else
+      begin
+        if not OpenDialog1.Execute then
+          Exit;
+        Image1.Picture.LoadFromFile(OpenDialog1.FileName);
+        lblCaminhoImagem.Caption := OpenDialog1.FileName;
+        LBase64.Text := ImageToBase64( Image1 );
+        LBase64.Text := StrExtFile_Base64Type( ExtractFileName(OpenDialog1.FileName) ) + LBase64.Text; //add DataURI
+      end;
+
+      imgBase64 := StringReplace(StringReplace(Trim(LBase64.Text), #13, '', [rfReplaceAll]), #10, '', [rfReplaceAll]);
+    finally
+      FreeAndNil(LBase64);
+    end;
+
+    //Action Buttons (url/phoneNumber). Reply Buttons (id) nao podem ser misturados com Action Buttons
+    options :=
+      'body: "Escolha um Produto", ' +
+      'footer: "Toque no Botão do Card", ' +
+      'cards: [ ' +
+      '  { ' +
+      '    image: "' + imgBase64 + '", ' +
+      '    title: "Produto 1", ' +
+      '    description: "Descrição do Produto 1", ' +
+      '    buttons: [ ' +
+      '      {url: "https://wppconnect-team.github.io/", text: "Acesse Nosso Site"}, ' +
+      '      {phoneNumber: "551734265560", text: "☎️ Qualquer Dúvida Ligue"} ' +
+      '    ] ' +
+      '  }, ' +
+      '  { ' +
+      '    image: "' + imgBase64 + '", ' +
+      '    title: "Produto 2", ' +
+      '    description: "Descrição do Produto 2", ' +
+      '    buttons: [ ' +
+      '      {url: "https://github.com/wppconnect-team/WPP4Delphi", text: "Ver no GitHub"} ' +
+      '    ] ' +
+      '  } ' +
+      '] ';
+
+    frDemo.TWPPConnect1.SendCarouselMessageNew(ed_num.Text, options, 'SEUID1', 'SEUID2', 'SEUID3', 'SEUID4');
+  finally
+    ed_num.SelectAll;
+    ed_num.SetFocus;
+  end;
+end;
+
+procedure TframeMensagem.btnBookingMessageClick(Sender: TObject);
+var
+  options, dtInicio, dtFim : string;
+begin
+  //Adicionado Por Marcelo 09/10/2026
+  try
+    if Trim(ed_num.Text) = '' then
+    begin
+      messageDlg('Informe o Celular para Continuar', mtWarning, [mbOk], 0);
+      ed_num.SetFocus;
+      Exit;
+    end;
+
+    if not frDemo.TWPPConnect1.Auth(False) then
+      Exit;
+
+    //Datas em ISO 8601 (amanha, duracao de 1 hora)
+    dtInicio := FormatDateTime('yyyy-mm-dd"T"hh:nn:ss', IncDay(Now, 1));
+    dtFim    := FormatDateTime('yyyy-mm-dd"T"hh:nn:ss', IncHour(IncDay(Now, 1), 1));
+
+    //Obrigatorio informar ao menos um destino: location, bookingUrl ou phoneNumber
+    options :=
+      'title: "Agendamento Confirmado", ' +
+      'body: "Sua visita técnica está agendada", ' +
+      'description: "Visita técnica WPP4Delphi", ' +
+      'startTime: "' + dtInicio + '", ' +
+      'endTime: "' + dtFim + '", ' +
+      'location: "Av. Paulista, 1000 - São Paulo", ' +
+      'bookingUrl: "https://wppconnect-team.github.io/", ' +
+      'phoneNumber: "551734265560", ' +
+      'managementUrl: "https://wppconnect-team.github.io/" ';
+
+    frDemo.TWPPConnect1.SendBookingMessageNew(ed_num.Text, options, 'SEUID1', 'SEUID2', 'SEUID3', 'SEUID4');
   finally
     ed_num.SelectAll;
     ed_num.SetFocus;
