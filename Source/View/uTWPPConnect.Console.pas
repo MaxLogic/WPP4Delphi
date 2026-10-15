@@ -201,6 +201,7 @@ type
     FConsoleMessageCount    : Integer;
     FLastConsoleMessageTick : UInt64;
     FQrMonitorRunCount      : Integer;
+    FLoadingProgress        : Double;
     FTimerConnect           : TTimer;
     FTimerMonitoring        : TTimer;
     FOnNotificationCenter   : TNotificationCenter;
@@ -241,6 +242,9 @@ type
       isLoading, canGoBack, canGoForward: Boolean);
     procedure Chromium1AddressChange(Sender: TObject; const browser: ICefBrowser; const frame: ICefFrame;
       const url: ustring);
+    procedure Chromium1BeforeBrowse(Sender: TObject; const browser: ICefBrowser; const frame: ICefFrame;
+      const request: ICefRequest; user_gesture, isRedirect: Boolean; out Result: Boolean);
+    procedure Chromium1LoadingProgressChange(Sender: TObject; const browser: ICefBrowser; const progress: Double);
     Procedure ResetEvents;
     procedure SetOwner(const Value: TComponent);
 
@@ -888,6 +892,26 @@ begin
     save_log('CEF: address ' + DiagnosticUrl(url) + '.');
 end;
 
+procedure TFrmConsole.Chromium1BeforeBrowse(Sender: TObject; const browser: ICefBrowser; const frame: ICefFrame;
+  const request: ICefRequest; user_gesture, isRedirect: Boolean; out Result: Boolean);
+begin
+  // Diagnostics only; never cancels a navigation.
+  Result := False;
+  if (frame <> nil) and frame.IsMain and (request <> nil) then
+    save_log(Format('CEF: navigation to %s (redirect=%s).', [DiagnosticUrl(request.Url), BoolToStr(isRedirect, True)]));
+end;
+
+procedure TFrmConsole.Chromium1LoadingProgressChange(Sender: TObject; const browser: ICefBrowser;
+  const progress: Double);
+begin
+  // A navigation stuck at a low value sent its request but got no page back.
+  if (Abs(progress - FLoadingProgress) >= 0.1) or ((progress >= 1) and (FLoadingProgress < 1)) then
+  begin
+    FLoadingProgress := progress;
+    save_log(Format('CEF: loading progress %d%%.', [Round(progress * 100)]));
+  end;
+end;
+
 procedure TFrmConsole.CountConsoleMessage;
 begin
   // Console messages arrive on the CEF UI thread only; readers on other threads accept a stale value.
@@ -923,13 +947,19 @@ begin
     Exit;
   end;
 
-  save_log(Format('Page diagnostics (%s): loading=%s, url=%s, titles=%d, console=%d, last console %s.', [
-    aReason, BoolToStr(Chromium1.IsLoading, True), DiagnosticUrl(Chromium1.DocumentURL), LPaginaId,
-    FConsoleMessageCount, lLastConsole]));
+  save_log(Format('Page diagnostics (%s): loading=%s, progress=%d%%, url=%s, titles=%d, console=%d, last console %s.', [
+    aReason, BoolToStr(Chromium1.IsLoading, True), Round(FLoadingProgress * 100), DiagnosticUrl(Chromium1.DocumentURL),
+    LPaginaId, FConsoleMessageCount, lLastConsole]));
 
   {$IFNDEF FPC}
   if not aIncludePageText then
     Exit;
+  // Without a document the text visitor is never called back; say so instead of logging nothing.
+  if Chromium1.DocumentURL = '' then
+  begin
+    save_log(Format('Page text (%s): no document loaded.', [aReason]));
+    Exit;
+  end;
   lFrame := Chromium1.Browser.MainFrame;
   if lFrame = nil then
     Exit;
@@ -5426,6 +5456,8 @@ begin
   Chromium1.OnLoadError          := Chromium1LoadError;
   Chromium1.OnLoadingStateChange := Chromium1LoadingStateChange;
   Chromium1.OnAddressChange      := Chromium1AddressChange;
+  Chromium1.OnBeforeBrowse       := Chromium1BeforeBrowse;
+  Chromium1.OnLoadingProgressChange := Chromium1LoadingProgressChange;
   FTimerMonitoring          := TTimer.Create(nil);
   FTimerMonitoring.Interval := 1000 * 10;  //10 segundos..
 
