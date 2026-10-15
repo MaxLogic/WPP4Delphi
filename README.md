@@ -31,3 +31,9 @@ installed apps may still reference them.
   stops working. Then retire it.
 - When the fork's `Source/JS/js.abr` changes, publish it too, so apps built earlier with the
   same compatibility version get it.
+
+## Testing
+
+`test/manifest-compat-1-retired.json` retires compatibility version 1. Apps never read it on their
+own; set `MEC_WHATSAPP_SCRIPT_MANIFEST` to its raw URL before starting the app to see the
+retirement notice.
