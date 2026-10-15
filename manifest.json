@@ -1,0 +1,13 @@
+{
+  "channel": "maxlogic-wpp4delphi-script",
+  "schema": 1,
+  "entries": [
+    {
+      "compat": 1,
+      "status": "active",
+      "scriptVersion": "2026.10.15.1",
+      "url": "https://raw.githubusercontent.com/MaxLogic/WPP4Delphi/script-channel/scripts/compat-1/js-2026.10.15.1.abr",
+      "sha256": "fed05e489742b57a25e0b9b50126dbde9aef89ba00463c99b91abf80bd2c965f"
+    }
+  ]
+}
