@@ -1245,9 +1245,14 @@ type
                    );
 
     TSecondCallback = procedure(SecondsRemaining: Integer) of object;
+    // Receives the WPP lifecycle diagnostics (every save_log line, including the browser events
+    // logged by TFrmConsole) so the host application can keep them in its own log.
+    // Called from the main thread and from the CEF UI thread.
+    TWPPDiagnosticLogProc = procedure(const aMessage: string);
 
 var
   gWPPSettingsIniFileName: string = '';
+  gWPPDiagnosticLog: TWPPDiagnosticLogProc = nil;
 
 function ResolveWPPSettingsIniFileName(const aDefaultDir: string): string;
 
@@ -1474,6 +1479,14 @@ var
   nomearq: string;
   arq: TextFile;
 begin
+  if Assigned(gWPPDiagnosticLog) then
+  begin
+    try
+      gWPPDiagnosticLog(line);
+    except
+      // Diagnostics must never break the WhatsApp flow.
+    end;
+  end;
   try
     if Assigned(GlobalCEFApp) then
     begin

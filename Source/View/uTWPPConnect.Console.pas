@@ -198,6 +198,9 @@ type
     FCanClose               : Boolean;
     FDirTemp                : String;
     FConectado              : Boolean;
+    FConsoleMessageCount    : Integer;
+    FLastConsoleMessageTick : UInt64;
+    FQrMonitorRunCount      : Integer;
     FTimerConnect           : TTimer;
     FTimerMonitoring        : TTimer;
     FOnNotificationCenter   : TNotificationCenter;
@@ -228,6 +231,16 @@ type
 
     procedure QRCodeForm_Start;
     procedure QRCodeWeb_Start;
+    function  QrMonitorRunLogged: Boolean;
+    procedure CountConsoleMessage;
+    procedure Chromium1LoadStart(Sender: TObject; const browser: ICefBrowser; const frame: ICefFrame;
+      transitionType: TCefTransitionType);
+    procedure Chromium1LoadError(Sender: TObject; const browser: ICefBrowser; const frame: ICefFrame;
+      errorCode: TCefErrorCode; const errorText, failedUrl: ustring);
+    procedure Chromium1LoadingStateChange(Sender: TObject; const browser: ICefBrowser;
+      isLoading, canGoBack, canGoForward: Boolean);
+    procedure Chromium1AddressChange(Sender: TObject; const browser: ICefBrowser; const frame: ICefFrame;
+      const url: ustring);
     Procedure ResetEvents;
     procedure SetOwner(const Value: TComponent);
 
@@ -244,6 +257,12 @@ type
     Function  ConfigureNetWork:Boolean;
     Procedure SetZoom(Pvalue: Integer);
     Property  Conectado: Boolean    Read FConectado;
+    Property  ConsoleMessageCount: Integer Read FConsoleMessageCount;
+    // Logs the browser state through save_log. With aIncludePageText the visible page text
+    // (whitespace collapsed, shortened) follows asynchronously from the CEF UI thread. It does
+    // not depend on the page console, so it also works when no console message arrives.
+    // Only request the page text before login: afterwards it contains chat content.
+    procedure LogPageDiagnostics(const aReason: string; aIncludePageText: Boolean);
     Property  OwnerForm: TComponent Read FOwner    Write SetOwner;
     Procedure StartQrCode(PQrCodeType :TFormQrCodeType; PViewForm:Boolean);
     Procedure StopQrCode(PQrCodeType: TFormQrCodeType);
@@ -805,6 +824,124 @@ begin
   Chromium1.Browser.MainFrame.ExecuteJavaScript(PScript, Purl, pStartline)
 end;
 
+function DiagnosticUrl(const aUrl: string): string;
+var
+  lCut: Integer;
+begin
+  Result := aUrl;
+  lCut := Pos('?', Result);
+  if lCut = 0 then
+    lCut := Pos('#', Result);
+  if lCut > 0 then
+    Result := Copy(Result, 1, lCut - 1);
+end;
+
+function DiagnosticPageText(const aText: string): string;
+const
+  cMaxLength = 600;
+var
+  i: Integer;
+  lPendingSpace: Boolean;
+begin
+  Result := '';
+  lPendingSpace := False;
+  for i := 1 to Length(aText) do
+  begin
+    if CharInSet(aText[i], [#9, #10, #13, ' ']) then
+      lPendingSpace := Result <> ''
+    else
+    begin
+      if lPendingSpace then
+        Result := Result + ' ';
+      lPendingSpace := False;
+      Result := Result + aText[i];
+      if Length(Result) >= cMaxLength then
+        Exit(Result + '...');
+    end;
+  end;
+end;
+
+procedure TFrmConsole.Chromium1LoadStart(Sender: TObject; const browser: ICefBrowser; const frame: ICefFrame;
+  transitionType: TCefTransitionType);
+begin
+  if (frame <> nil) and frame.IsMain then
+    save_log(Format('CEF: load start (transition=%d, url=%s).', [Integer(transitionType), DiagnosticUrl(frame.Url)]));
+end;
+
+procedure TFrmConsole.Chromium1LoadError(Sender: TObject; const browser: ICefBrowser; const frame: ICefFrame;
+  errorCode: TCefErrorCode; const errorText, failedUrl: ustring);
+begin
+  if (frame <> nil) and frame.IsMain then
+    save_log(Format('CEF: load error %d (%s), url=%s.', [Integer(errorCode), errorText, DiagnosticUrl(failedUrl)]));
+end;
+
+procedure TFrmConsole.Chromium1LoadingStateChange(Sender: TObject; const browser: ICefBrowser;
+  isLoading, canGoBack, canGoForward: Boolean);
+begin
+  save_log(Format('CEF: loading=%s.', [BoolToStr(isLoading, True)]));
+end;
+
+procedure TFrmConsole.Chromium1AddressChange(Sender: TObject; const browser: ICefBrowser; const frame: ICefFrame;
+  const url: ustring);
+begin
+  if (frame <> nil) and frame.IsMain then
+    save_log('CEF: address ' + DiagnosticUrl(url) + '.');
+end;
+
+procedure TFrmConsole.CountConsoleMessage;
+begin
+  // Console messages arrive on the CEF UI thread only; readers on other threads accept a stale value.
+  Inc(FConsoleMessageCount);
+  FLastConsoleMessageTick := GetTickCount64;
+  if FConsoleMessageCount = 1 then
+    save_log('CEF: first console message received.');
+end;
+
+function TFrmConsole.QrMonitorRunLogged: Boolean;
+begin
+  // The QR monitor runs every 2 s; log the first run and then every 30 s only.
+  Result := (FQrMonitorRunCount <= 1) or (FQrMonitorRunCount mod 15 = 0);
+end;
+
+procedure TFrmConsole.LogPageDiagnostics(const aReason: string; aIncludePageText: Boolean);
+var
+  lLastConsole: string;
+  {$IFNDEF FPC}
+  lFrame: ICefFrame;
+  lReason: string;
+  {$ENDIF}
+begin
+  if FLastConsoleMessageTick = 0 then
+    lLastConsole := 'never'
+  else
+    lLastConsole := IntToStr((GetTickCount64 - FLastConsoleMessageTick) div 1000) + ' s ago';
+
+  if (Chromium1 = nil) or (Chromium1.Browser = nil) then
+  begin
+    save_log(Format('Page diagnostics (%s): no browser (Conectado=%s, console=%d, last console %s).', [
+      aReason, BoolToStr(FConectado, True), FConsoleMessageCount, lLastConsole]));
+    Exit;
+  end;
+
+  save_log(Format('Page diagnostics (%s): loading=%s, url=%s, titles=%d, console=%d, last console %s.', [
+    aReason, BoolToStr(Chromium1.IsLoading, True), DiagnosticUrl(Chromium1.DocumentURL), LPaginaId,
+    FConsoleMessageCount, lLastConsole]));
+
+  {$IFNDEF FPC}
+  if not aIncludePageText then
+    Exit;
+  lFrame := Chromium1.Browser.MainFrame;
+  if lFrame = nil then
+    Exit;
+  lReason := aReason;
+  lFrame.GetTextProc(
+    procedure(const aText: ustring)
+    begin
+      save_log(Format('Page text (%s): %s', [lReason, DiagnosticPageText(aText)]));
+    end);
+  {$ENDIF}
+end;
+
 procedure TFrmConsole.QRCodeWeb_Start;
 begin
   ExecuteJS(FrmConsole_JS_WEBmonitorQRCode, False);
@@ -821,14 +958,17 @@ begin
     LInitialized := False;
     if Chromium1 <> nil then
       LInitialized := Chromium1.Initialized;
-    save_log(Format('QRCodeForm_Start: browser not ready (Conectado=%s, Initialized=%s).', [
+    if QrMonitorRunLogged then
+      save_log(Format('QRCodeForm_Start: browser not ready (Conectado=%s, Initialized=%s).', [
       BoolToStr(FConectado, True),
       BoolToStr(LInitialized, True)
     ]));
     Exit;
   end;
 
-  save_log(Format('QRCodeForm_Start: exec QR monitor (len=%d).', [Length(FrmConsole_JS_monitorQRCode)]));
+  if QrMonitorRunLogged then
+    save_log(Format('QRCodeForm_Start: exec QR monitor run %d (len=%d).', [FQrMonitorRunCount,
+      Length(FrmConsole_JS_monitorQRCode)]));
   try
     Chromium1.Browser.MainFrame.ExecuteJavaScript(FrmConsole_JS_monitorQRCode, '', 0);
   except
@@ -958,10 +1098,13 @@ begin
   
   TTimer(Sender).Enabled := False;
   try
-    save_log(Format('OnTimerGetQrCode: FormType=%d, Conectado=%s.', [
-      Ord(FFormType),
-      BoolToStr(FConectado, True)
-    ]));
+    Inc(FQrMonitorRunCount);
+    if QrMonitorRunLogged then
+      save_log(Format('OnTimerGetQrCode: run %d, FormType=%d, Conectado=%s.', [
+        FQrMonitorRunCount,
+        Ord(FFormType),
+        BoolToStr(FConectado, True)
+      ]));
     try
       if (FFormType in [Ft_Desktop, Ft_none]) Then
         QRCodeForm_Start
@@ -3094,6 +3237,7 @@ end;
 procedure TFrmConsole.Chromium1BeforeClose(Sender: TObject;
   const browser: ICefBrowser);
 begin
+  save_log('CEF: browser closing.');
   CEFSentinel1.Start;
 end;
 
@@ -4262,6 +4406,7 @@ procedure TFrmConsole.Chromium1ConsoleMessage(Sender: TObject;
 var
   AResponse  : TResponseConsoleMessage;
 begin
+  CountConsoleMessage;
   try
     if Assigned(TWPPConnect(FOwner).OnBrowserConsoleMessage) then
       TWPPConnect(FOwner).OnBrowserConsoleMessage(FOwner, message, source, line, Ord(level));
@@ -4465,6 +4610,7 @@ procedure TFrmConsole.Chromium1ConsoleMessage(Sender: TObject;
 var
   AResponse  : TResponseConsoleMessage;
 begin
+  CountConsoleMessage;
   try
     if Assigned(TWPPConnect(FOwner).OnBrowserConsoleMessage) then
       TWPPConnect(FOwner).OnBrowserConsoleMessage(FOwner, message, source, line, Integer(level));
@@ -4759,6 +4905,9 @@ end;
 procedure TFrmConsole.Chromium1LoadEnd(Sender: TObject;
   const browser: ICefBrowser; const frame: ICefFrame; httpStatusCode: Integer);
 begin
+  if (frame <> nil) and frame.IsMain then
+    save_log(Format('CEF: load end (http=%d, url=%s).', [httpStatusCode, DiagnosticUrl(frame.Url)]));
+
   if (TWPPConnect(FOwner).Status = Server_Rebooting)
   //or (TWPPConnect(FOwner).Status = Server_Connected)
   then
@@ -4881,6 +5030,7 @@ begin
 
   try
     LogAdd('White Screen problem Render', vStatus);
+    save_log('CEF: render process terminated: ' + vStatus);
     LJS   := 'Reboot Services - White Screen problem Render ' + vStatus + '...';
     ExecuteJS(LJS, true);
   except on E: Exception do
@@ -4924,6 +5074,7 @@ begin
 
   try
     LogAdd('White Screen problem Render', vStatus);
+    save_log('CEF: render process terminated: ' + vStatus);
     LJS   := 'Reboot Services - White Screen problem Render ' + vStatus + '...';
     ExecuteJS(LJS, true);
   except on E: Exception do
@@ -4996,6 +5147,7 @@ end;
 procedure TFrmConsole.Chromium1TitleChange(Sender: TObject; const browser: ICefBrowser; const title: ustring);
 begin
   LPaginaId := LPaginaId + 1;
+  save_log(Format('CEF: title #%d: %s', [LPaginaId, title]));
 
   if (LPaginaId > 3) and (LPaginaId < 10) then
   begin
@@ -5270,6 +5422,10 @@ begin
 
   GlobalCEFApp.Chromium     := Chromium1;
   Chromium1.DefaultURL      := FrmConsole_JS_URL;
+  Chromium1.OnLoadStart          := Chromium1LoadStart;
+  Chromium1.OnLoadError          := Chromium1LoadError;
+  Chromium1.OnLoadingStateChange := Chromium1LoadingStateChange;
+  Chromium1.OnAddressChange      := Chromium1AddressChange;
   FTimerMonitoring          := TTimer.Create(nil);
   FTimerMonitoring.Interval := 1000 * 10;  //10 segundos..
 
