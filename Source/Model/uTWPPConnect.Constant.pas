@@ -1250,9 +1250,18 @@ type
     // Called from the main thread and from the CEF UI thread.
     TWPPDiagnosticLogProc = procedure(const aMessage: string);
 
+const
+  // MaxLogic fork: compatibility version of this Delphi code with the injected script (js.abr).
+  // Independent of TWPPConnectVersion, which follows upstream. Increase it whenever a script
+  // change needs matching Delphi changes; the script channel publishes one script per value.
+  TWPPConnectCompatVersion = 1;
+
 var
   gWPPSettingsIniFileName: string = '';
   gWPPDiagnosticLog: TWPPDiagnosticLogProc = nil;
+  // MaxLogic fork: when set, the script is loaded from this file instead of <exe dir>\js.abr.
+  // Set it before GlobalCEFApp.StartMainProcess.
+  gWPPScriptFileName: string = '';
 
 function ResolveWPPSettingsIniFileName(const aDefaultDir: string): string;
 

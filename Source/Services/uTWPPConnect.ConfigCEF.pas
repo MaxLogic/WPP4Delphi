@@ -510,7 +510,10 @@ begin
   Caminho_JS           := FIniFIle.ReadString('TWPPConnect Comp', 'Caminho JS', TWPPConnectJS_JSUrlPadrao);
 
 
-  FPathJS              := FDirApp + NomeArquivoInject;
+  if Trim(gWPPScriptFileName) <> '' then
+    FPathJS            := gWPPScriptFileName
+  else
+    FPathJS            := FDirApp + NomeArquivoInject;
   FErrorInt            := False;
   FStartTimeOut        := 5000; //(+- 5 Segundos)
   FPathJsUpdate        := StrToDateTimeDef(Lx, EncodeDateTime(1500, 1, 1, 0, 0, 0, 0), LFormatSettings);
