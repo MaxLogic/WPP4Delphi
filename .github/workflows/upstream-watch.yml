@@ -1,0 +1,94 @@
+# Weekly check whether upstream WPP4Delphi has commits that our fork branch lacks.
+# While our branch is behind, one open issue (label "upstream-watch") lists the
+# missing commits and says whether the WhatsApp script Source/JS/js.abr changed.
+# The issue is closed automatically once our branch contains all upstream commits.
+name: Upstream watch
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      fork_ref:
+        description: 'Branch or commit of our fork to compare (default: fix/remove-compiler-warnings)'
+        required: false
+        default: ''
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+
+env:
+  UPSTREAM_OWNER: wppconnect-team
+  UPSTREAM_REPO: WPP4Delphi
+  UPSTREAM_BRANCH: main
+  FORK_BRANCH: fix/remove-compiler-warnings
+  LABEL: upstream-watch
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      FORK_REF: ${{ inputs.fork_ref }}
+    steps:
+      - name: Keep the schedule alive
+        # GitHub suspends scheduled workflows after 60 days without repository activity.
+        run: gh api -X PUT "repos/$GH_REPO/actions/workflows/upstream-watch.yml/enable"
+
+      - name: Compare our branch with upstream
+        run: |
+          set -euo pipefail
+          if [ -n "${FORK_REF:-}" ]; then FORK_BRANCH="$FORK_REF"; fi
+          fork_ref=$(jq -rn --arg b "$FORK_BRANCH" '$b|@uri')
+          gh api "repos/$GH_REPO/compare/${fork_ref}...${UPSTREAM_OWNER}:${UPSTREAM_BRANCH}" > compare.json
+          missing=$(jq '.ahead_by' compare.json)
+          gh label create "$LABEL" --color FBCA04 --description 'Upstream WPP4Delphi has changes our fork lacks' 2>/dev/null || true
+          issue=$(gh issue list --state open --label "$LABEL" --json number --jq '.[0].number // empty')
+
+          if [ "$missing" -eq 0 ]; then
+            echo "Our branch $FORK_BRANCH contains all upstream commits."
+            if [ -n "$issue" ]; then
+              gh issue close "$issue" --comment "Our branch \`$FORK_BRANCH\` now contains all upstream commits."
+            fi
+            exit 0
+          fi
+
+          upstream_head=$(gh api "repos/$UPSTREAM_OWNER/$UPSTREAM_REPO/commits/$UPSTREAM_BRANCH" --jq '.sha')
+          upstream_version=$(gh api -H 'Accept: application/vnd.github.raw' \
+            "repos/$UPSTREAM_OWNER/$UPSTREAM_REPO/contents/Source/Model/uTWPPConnect.Constant.pas?ref=$UPSTREAM_BRANCH" \
+            | grep -m1 -oP "TWPPConnectVersion\s*=\s*'\K[^']+" || echo unknown)
+          js_changed=$(jq '[.files[]? | select(.filename == "Source/JS/js.abr")] | length' compare.json)
+          if [ "$js_changed" -gt 0 ]; then
+            js_note='**Yes.** Merge, test the QR login and a test send, then publish the script for our current compatibility version.'
+          else
+            js_note='No.'
+          fi
+
+          {
+            echo "Upstream \`$UPSTREAM_OWNER/$UPSTREAM_REPO@$UPSTREAM_BRANCH\` has **$missing** commit(s) that our branch \`$FORK_BRANCH\` lacks."
+            echo
+            echo "- Upstream TWPPConnectVersion: \`$upstream_version\`"
+            echo "- Upstream head: $UPSTREAM_OWNER/$UPSTREAM_REPO@$upstream_head"
+            echo "- WhatsApp script \`Source/JS/js.abr\` changed: $js_note"
+            echo "- Compare: https://github.com/$GH_REPO/compare/$FORK_BRANCH...$UPSTREAM_OWNER:$UPSTREAM_REPO:$UPSTREAM_BRANCH"
+            echo
+            echo "### Missing commits (newest first, up to 50)"
+            echo
+            jq -r '.commits | reverse | .[:50][] | "- \(.sha[0:7]) \(.commit.author.date[0:10]) \(.commit.message | split("\n")[0])"' compare.json
+            echo
+            echo "_Updated by the upstream-watch workflow on $(date -u +%Y-%m-%d)._"
+            echo "<!-- upstream-head: $upstream_head -->"
+          } > body.md
+
+          if [ -z "$issue" ]; then
+            gh issue create --title 'Upstream WPP4Delphi has changes our fork lacks' --label "$LABEL" --body-file body.md
+          else
+            previous_head=$(gh issue view "$issue" --json body --jq '.body' | grep -oP '(?<=upstream-head: )[0-9a-f]+' || true)
+            gh issue edit "$issue" --body-file body.md
+            if [ "$previous_head" != "$upstream_head" ]; then
+              gh issue comment "$issue" --body "Upstream moved on: now $missing commit(s) missing, upstream head $UPSTREAM_OWNER/$UPSTREAM_REPO@$upstream_head."
+            fi
+          fi
