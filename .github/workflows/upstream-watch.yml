@@ -36,7 +36,14 @@ jobs:
     steps:
       - name: Keep the schedule alive
         # GitHub suspends scheduled workflows after 60 days without repository activity.
-        run: gh api -X PUT "repos/$GH_REPO/actions/workflows/upstream-watch.yml/enable"
+        # Retry so a one-off API error (2026-11-02) does not fail the run; a persistent failure still does.
+        run: |
+          for attempt in 1 2 3; do
+            gh api -X PUT "repos/$GH_REPO/actions/workflows/upstream-watch.yml/enable" && exit 0
+            echo "::warning::Enabling the workflow failed (attempt $attempt of 3)."
+            sleep 10
+          done
+          exit 1
 
       - name: Compare our branch with upstream
         run: |
